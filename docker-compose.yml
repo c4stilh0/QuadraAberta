@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: quadra_aberta_pg
+    restart: always
+    environment:
+      POSTGRES_DB: quadra_aberta_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgressecret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:

@@ -19,6 +19,10 @@ public interface QuadraRepository extends JpaRepository<Quadra, Long> {
 
     List<Quadra> findByBairroIgnoreCase(String bairro);
 
+    boolean existsByNome(String nome);
+
+    Optional<Quadra> findByNome(String nome);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT q FROM Quadra q WHERE q.id = :id")
     Optional<Quadra> findByIdWithLock(@Param("id") Long id);

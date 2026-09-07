@@ -28,6 +28,13 @@ public record QuadraRequestDTO(
         @NotNull(message = "Informe se a quadra possui iluminação.")
         Boolean possuiIluminacao,
 
+        java.math.BigDecimal latitude,
+
+        java.math.BigDecimal longitude,
+
+        @Size(max = 250, message = "Modalidades devem ter no máximo 250 caracteres.")
+        String modalidades,
+
         @NotNull(message = "O status da quadra é obrigatório.")
         StatusQuadra status
 ) {}

@@ -12,6 +12,9 @@ public record QuadraResponseDTO(
         String cep,
         TipoPiso tipoPiso,
         Boolean possuiIluminacao,
+        java.math.BigDecimal latitude,
+        java.math.BigDecimal longitude,
+        String modalidades,
         StatusQuadra status
 ) {
     public static QuadraResponseDTO fromEntity(Quadra quadra) {
@@ -23,6 +26,9 @@ public record QuadraResponseDTO(
                 quadra.getCep(),
                 quadra.getTipoPiso(),
                 quadra.getPossuiIluminacao(),
+                quadra.getLatitude(),
+                quadra.getLongitude(),
+                quadra.getModalidades(),
                 quadra.getStatus()
         );
     }

@@ -39,6 +39,15 @@ public class Quadra {
     @Builder.Default
     private Boolean possuiIluminacao = false;
 
+    @Column(precision = 10, scale = 7)
+    private java.math.BigDecimal latitude;
+
+    @Column(precision = 10, scale = 7)
+    private java.math.BigDecimal longitude;
+
+    @Column(length = 250)
+    private String modalidades;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

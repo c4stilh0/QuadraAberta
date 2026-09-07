@@ -23,6 +23,16 @@ import java.util.List;
 public class QuadraController {
 
     private final QuadraService quadraService;
+    private final com.quadraaberta.api.service.QuadraIngestionService quadraIngestionService;
+
+    @PostMapping("/sincronizar-osm")
+    @PreAuthorize("hasAuthority('ROLE_GESTOR')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Sincronizar espaços esportivos de Sete Lagoas", description = "Importa e atualiza automaticamente todos os espaços esportivos e quadras de Sete Lagoas via OpenStreetMap e catálogo municipal.")
+    public ResponseEntity<java.util.Map<String, Object>> sincronizarOsm() {
+        java.util.Map<String, Object> resultado = quadraIngestionService.sincronizarQuadrasSeteLagoas();
+        return ResponseEntity.ok(resultado);
+    }
 
     @GetMapping
     @Operation(summary = "Listar quadras públicas", description = "Permite filtrar quadras por status (ex: DISPONIVEL) ou por bairro.")

@@ -27,6 +27,9 @@ public class QuadraService {
                 .cep(dto.cep() != null ? dto.cep().trim() : null)
                 .tipoPiso(dto.tipoPiso())
                 .possuiIluminacao(dto.possuiIluminacao())
+                .latitude(dto.latitude())
+                .longitude(dto.longitude())
+                .modalidades(dto.modalidades() != null ? dto.modalidades().trim() : null)
                 .status(dto.status())
                 .build();
 
@@ -44,6 +47,9 @@ public class QuadraService {
         quadra.setCep(dto.cep() != null ? dto.cep().trim() : null);
         quadra.setTipoPiso(dto.tipoPiso());
         quadra.setPossuiIluminacao(dto.possuiIluminacao());
+        quadra.setLatitude(dto.latitude());
+        quadra.setLongitude(dto.longitude());
+        quadra.setModalidades(dto.modalidades() != null ? dto.modalidades().trim() : null);
         quadra.setStatus(dto.status());
 
         return QuadraResponseDTO.fromEntity(quadra);

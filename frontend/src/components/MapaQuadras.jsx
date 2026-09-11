@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation, CalendarPlus, AlertTriangle, Moon, Sun, ShieldCheck } from 'lucide-react';
+import { MapPin, Navigation, CalendarPlus, Wrench } from 'lucide-react';
 
 // Coordenadas centrais de Sete Lagoas / MG
 const SETE_LAGOAS_CENTER = [-19.4658, -44.2467];
@@ -275,7 +275,7 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
         </div>
 
         {quadraSelecionada && (
-          <div className="pt-3 border-t border-slate-800">
+          <div className="pt-3 border-t border-slate-800 space-y-2">
             <button
               onClick={() => onReservar(quadraSelecionada)}
               disabled={quadraSelecionada.status !== 'DISPONIVEL'}
@@ -284,6 +284,15 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
               <CalendarPlus className="w-3.5 h-3.5" />
               <span>Agendar Selecionada</span>
             </button>
+            {onVerChamados && (
+              <button
+                onClick={() => onVerChamados(quadraSelecionada)}
+                className="w-full py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all flex items-center justify-center space-x-1.5 border border-slate-700"
+              >
+                <Wrench className="w-3 h-3 text-amber-400" />
+                <span>Relatar Problema</span>
+              </button>
+            )}
           </div>
         )}
       </div>

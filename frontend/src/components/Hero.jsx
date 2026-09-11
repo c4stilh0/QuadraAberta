@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Clock, Camera, Sparkles } from 'lucide-react';
 
-export default function Hero({ onExploreQuadras }) {
+export default function Hero() {
   return (
     <div className="relative overflow-hidden py-12 px-4 sm:px-6 lg:px-8 border-b border-slate-800/80 bg-gradient-to-b from-slate-900/60 to-transparent">
       {/* Background radial glow */}

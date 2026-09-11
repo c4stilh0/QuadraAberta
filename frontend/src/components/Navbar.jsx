@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Calendar, Users, Wrench, LogIn, LogOut, UserCheck, PlusCircle } from 'lucide-react';
+import { Trophy, Calendar, Users, Wrench, LogIn, LogOut, PlusCircle } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab, user, onOpenAuth, onLogout, onOpenNovaQuadra }) {
   const getRoleBadge = (role) => {

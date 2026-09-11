@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Wrench, PlusCircle, AlertCircle, CheckCircle2, Clock, Camera, Image as ImageIcon, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Wrench, CheckCircle2, Camera, Image as ImageIcon, Check } from 'lucide-react';
 import { api } from '../api/client';
 
-export default function ZeladoriaView({ user, quadras, onOpenNovoChamado }) {
+export default function ZeladoriaView({ user, onOpenNovoChamado }) {
   const [chamados, setChamados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [atualizandoId, setAtualizandoId] = useState(null);
 
-  const carregarChamados = async () => {
+  const carregarChamados = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.chamados.listarTodos();
@@ -18,11 +18,11 @@ export default function ZeladoriaView({ user, quadras, onOpenNovoChamado }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     carregarChamados();
-  }, []);
+  }, [carregarChamados]);
 
   const handleMudarStatus = async (chamadoId, novoStatus) => {
     try {

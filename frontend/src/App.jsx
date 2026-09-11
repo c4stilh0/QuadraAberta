@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import QuadraCard from './components/QuadraCard';
@@ -11,7 +11,7 @@ import NovaQuadraModal from './components/NovaQuadraModal';
 import MapaQuadras from './components/MapaQuadras';
 import AuthModal from './components/AuthModal';
 import { api, getCurrentUser } from './api/client';
-import { Filter, Search, Calendar, Trash2, AlertCircle, LayoutGrid, Map as MapIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Calendar, Trash2, AlertCircle, LayoutGrid, Map as MapIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('quadras');
@@ -27,7 +27,6 @@ export default function App() {
 
   // Minhas Reservas
   const [minhasReservas, setMinhasReservas] = useState([]);
-  const [loadingMinhasReservas, setLoadingMinhasReservas] = useState(false);
 
   // Modais
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -37,7 +36,7 @@ export default function App() {
   const [novaTurmaOpen, setNovaTurmaOpen] = useState(false);
   const [novaQuadraOpen, setNovaQuadraOpen] = useState(false);
 
-  const carregarQuadras = async () => {
+  const carregarQuadras = useCallback(async () => {
     try {
       setLoadingQuadras(true);
       const data = await api.quadras.listar({
@@ -50,30 +49,27 @@ export default function App() {
     } finally {
       setLoadingQuadras(false);
     }
-  };
+  }, [filtroBairro, filtroStatus]);
 
-  const carregarMinhasReservas = async () => {
+  const carregarMinhasReservas = useCallback(async () => {
     if (!user) return;
     try {
-      setLoadingMinhasReservas(true);
       const data = await api.reservas.listarMinhas();
       setMinhasReservas(data || []);
     } catch {
       // Ignora erro
-    } finally {
-      setLoadingMinhasReservas(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     carregarQuadras();
-  }, [filtroBairro, filtroStatus]);
+  }, [carregarQuadras]);
 
   useEffect(() => {
     if (activeTab === 'quadras' && user) {
       carregarMinhasReservas();
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, carregarMinhasReservas]);
 
   const handleLogout = () => {
     api.auth.logout();
@@ -171,7 +167,7 @@ export default function App() {
       />
 
       {/* Hero Banner apenas na aba de quadras */}
-      {activeTab === 'quadras' && <Hero onExploreQuadras={() => {}} />}
+      {activeTab === 'quadras' && <Hero />}
 
       <main className="flex-1">
         {activeTab === 'quadras' && (
@@ -378,7 +374,6 @@ export default function App() {
         {activeTab === 'turmas' && (
           <TurmasList
             user={user}
-            quadras={quadras}
             onOpenNovaTurma={() => {
               if (!user) setAuthModalOpen(true);
               else setNovaTurmaOpen(true);
@@ -389,7 +384,6 @@ export default function App() {
         {activeTab === 'zeladoria' && (
           <ZeladoriaView
             user={user}
-            quadras={quadras}
             onOpenNovoChamado={() => {
               if (!user) setAuthModalOpen(true);
               else {

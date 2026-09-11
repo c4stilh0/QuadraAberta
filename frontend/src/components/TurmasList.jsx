@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Clock, MapPin, User, PlusCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, Clock, MapPin, User, PlusCircle, AlertCircle } from 'lucide-react';
 import { api } from '../api/client';
 
-export default function TurmasList({ user, quadras, onOpenNovaTurma }) {
+export default function TurmasList({ user, onOpenNovaTurma }) {
   const [turmas, setTurmas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
 
-  const carregarTurmas = async () => {
+  const carregarTurmas = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.turmas.listarTodas();
       setTurmas(data || []);
-    } catch (err) {
+    } catch {
       setErro('Não foi possível carregar as turmas sociais.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     carregarTurmas();
-  }, []);
+  }, [carregarTurmas]);
 
   const formatarDia = (dia) => {
     switch (dia) {

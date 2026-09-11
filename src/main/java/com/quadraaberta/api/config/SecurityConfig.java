@@ -48,9 +48,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos de autenticação e documentação
+                        // Endpoints públicos de autenticação, documentação e uploads locais
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
                         
                         // Leitura pública de quadras e chamados da comunidade
                         .requestMatchers(HttpMethod.GET, "/api/quadras/**").permitAll()

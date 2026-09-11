@@ -43,6 +43,14 @@ public class Usuario implements UserDetails {
     @Column(nullable = false, length = 30)
     private Role role;
 
+    @Column(name = "foto_url", length = 255)
+    private String fotoUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    @Builder.Default
+    private com.quadraaberta.api.entity.enums.ObjetivoUsuario objetivo = com.quadraaberta.api.entity.enums.ObjetivoUsuario.PRATICAR_ESPORTES;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean ativo = true;

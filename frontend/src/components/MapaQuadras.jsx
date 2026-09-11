@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation, CalendarPlus, Wrench } from 'lucide-react';
+import { MapPin, Navigation, CalendarPlus, Wrench, Crosshair, Sparkles } from 'lucide-react';
 
 // Coordenadas centrais de Sete Lagoas / MG
 const SETE_LAGOAS_CENTER = [-19.4658, -44.2467];
@@ -42,11 +42,32 @@ function getQuadraCoords(quadra) {
   return [lat, lng];
 }
 
+// Fórmula de Haversine para cálculo de distância em quilômetros
+function calcularDistanciaKm(coord1, coord2) {
+  if (!coord1 || !coord2) return null;
+  const R = 6371; // Raio da Terra em km
+  const dLat = ((coord2[0] - coord1[0]) * Math.PI) / 180;
+  const dLon = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((coord1[0] * Math.PI) / 180) *
+      Math.cos((coord2[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const dist = R * c;
+  return dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)} km`;
+}
+
 export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const userLocationLayerRef = useRef(null);
+
   const [quadraSelecionada, setQuadraSelecionada] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
 
   // Inicialização única do mapa Leaflet
   useEffect(() => {
@@ -68,9 +89,14 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    // Camada de marcadores
+    // Camada de quadras
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
+
+    // Camada de localização do usuário
+    const userLocationLayer = L.layerGroup().addTo(map);
+    userLocationLayerRef.current = userLocationLayer;
+
     mapInstanceRef.current = map;
 
     // Força recálculo das dimensões do Leaflet após montagem no DOM
@@ -86,7 +112,85 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
     };
   }, []);
 
-  // Atualiza marcadores quando a lista de quadras mudar
+  // Busca localização do usuário automaticamente ao carregar
+  useEffect(() => {
+    obterLocalizacaoUsuario(false);
+  }, []);
+
+  const obterLocalizacaoUsuario = (centralizar = false) => {
+    if (!('geolocation' in navigator)) return;
+
+    setLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setUserLocation(coords);
+        setLoadingLocation(false);
+
+        if (centralizar && mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo(coords, 15, { duration: 1.2 });
+        }
+      },
+      (err) => {
+        setLoadingLocation(false);
+        console.warn('Geolocalização não concedida ou indisponível:', err.message);
+        if (centralizar) {
+          alert('Não foi possível obter sua localização. Verifique as permissões de localização do seu navegador.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  // Renderiza marcador de localização do usuário no mapa
+  useEffect(() => {
+    const layer = userLocationLayerRef.current;
+    if (!layer) return;
+
+    layer.clearLayers();
+
+    if (userLocation) {
+      // Círculo de precisão e raio de proximidade ao redor do usuário
+      L.circle(userLocation, {
+        radius: 250,
+        color: '#38bdf8',
+        fillColor: '#38bdf8',
+        fillOpacity: 0.15,
+        weight: 1.5,
+        dashArray: '4, 6',
+      }).addTo(layer);
+
+      // Marcador pulsante estilo GPS moderno em Cyan/Azul vibrante
+      const userIcon = L.divIcon({
+        className: 'user-gps-marker',
+        html: `
+          <div class="relative flex items-center justify-center w-10 h-10 cursor-pointer">
+            <span class="absolute -inset-2 rounded-full bg-sky-400/40 animate-ping"></span>
+            <span class="absolute -inset-1 rounded-full bg-sky-500/30"></span>
+            <div class="relative w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center border-2 border-white shadow-lg shadow-sky-500/60">
+              <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+            </div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20],
+      });
+
+      const userMarker = L.marker(userLocation, { icon: userIcon, zIndexOffset: 1000 }).addTo(layer);
+
+      const userPopupHtml = `
+        <div style="min-width:180px;font-family:inherit;padding:4px;text-align:center;">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:#38bdf8;margin-bottom:2px;">📍 Você está aqui</div>
+          <h4 style="font-size:13px;font-weight:700;color:#ffffff;margin:0 0 2px 0;">Sua Posição Atual</h4>
+          <p style="font-size:10px;color:#94a3b8;margin:0;">Localização georreferenciada do morador</p>
+        </div>
+      `;
+      userMarker.bindPopup(userPopupHtml);
+    }
+  }, [userLocation]);
+
+  // Atualiza marcadores quando a lista de quadras ou a localização do usuário mudar
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layer = markersLayerRef.current;
@@ -143,10 +247,19 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
 
       const iluminacaoText = q.possuiIluminacao ? '🌙 Iluminação Noturna' : '☀️ Apenas Diurno';
 
+      // Distância em relação à localização atual do usuário
+      const distTexto = userLocation ? calcularDistanciaKm(userLocation, coords) : null;
+      const distBadge = distTexto
+        ? `<span style="background:rgba(14,165,233,0.15);color:#38bdf8;border:1px solid rgba(14,165,233,0.3);padding:2px 6px;border-radius:6px;font-size:10px;font-weight:600;">⚡ a ${distTexto} de você</span>`
+        : '';
+
       const popupHtml = `
         <div style="min-width:210px;font-family:inherit;padding:6px 2px;">
-          <div style="font-size:10px;text-transform:uppercase;color:#94a3b8;margin-bottom:2px;">${statusLabel}</div>
-          <h4 style="font-size:14px;font-weight:700;color:#ffffff;margin:0 0 4px 0;">${q.nome}</h4>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+            <span style="font-size:10px;text-transform:uppercase;color:#94a3b8;">${statusLabel}</span>
+            ${distBadge}
+          </div>
+          <h4 style="font-size:14px;font-weight:700;color:#ffffff;margin:2px 0 4px 0;">${q.nome}</h4>
           <p style="font-size:11px;color:#94a3b8;margin:0 0 4px 0;">📍 ${q.bairro} — ${q.logradouro}</p>
           ${q.modalidades ? `<div style="font-size:10px;color:#38bdf8;font-weight:600;margin-bottom:6px;text-transform:uppercase;">⚡ ${q.modalidades}</div>` : ''}
           <div style="display:flex;gap:4px;margin-bottom:10px;font-size:10px;color:#cbd5e1;flex-wrap:wrap;">
@@ -175,12 +288,12 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
       });
     });
 
-    // Se houver quadras filtradas, ajusta visualização para a primeira
+    // Se houver apenas 1 quadra filtrada, foca nela
     if (quadras.length === 1) {
       const singleCoords = getQuadraCoords(quadras[0]);
       map.flyTo(singleCoords, 15, { duration: 1 });
     }
-  }, [quadras, onReservar]);
+  }, [quadras, userLocation, onReservar]);
 
   const centralizarSeteLagoas = () => {
     if (mapInstanceRef.current) {
@@ -207,22 +320,36 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
           className="glass-panel hover:bg-slate-800/90 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl flex items-center space-x-1.5 shadow-lg border border-slate-700 transition-all hover:scale-105"
         >
           <Navigation className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Centralizar Sete Lagoas</span>
+          <span>Visão Geral Sete Lagoas</span>
+        </button>
+
+        <button
+          onClick={() => obterLocalizacaoUsuario(true)}
+          disabled={loadingLocation}
+          className="glass-panel hover:bg-slate-800/90 text-sky-300 text-xs font-semibold px-3 py-2 rounded-xl flex items-center space-x-1.5 shadow-lg border border-sky-500/30 transition-all hover:scale-105 hover:border-sky-500/60"
+          title="Centralizar na minha localização atual"
+        >
+          <Crosshair className={`w-3.5 h-3.5 text-sky-400 ${loadingLocation ? 'animate-spin' : ''}`} />
+          <span>{loadingLocation ? 'Localizando...' : 'Minha Localização'}</span>
         </button>
 
         <span className="glass-panel text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700 font-medium">
-          Exibindo <strong className="text-emerald-400">{quadras.length}</strong> {quadras.length === 1 ? 'quadra' : 'quadras'}
+          Exibindo <strong className="text-emerald-400">{quadras.length}</strong> {quadras.length === 1 ? 'espaço' : 'espaços'}
         </span>
       </div>
 
       {/* Container Leaflet do Mapa */}
-      <div ref={mapContainerRef} className="w-full h-[580px] z-10 dark-map-tiles" />
+      <div ref={mapContainerRef} className="w-full h-[620px] z-10 dark-map-tiles" />
 
       {/* Legenda de Status inferior esquerda */}
-      <div className="absolute bottom-4 left-4 z-20 glass-panel p-3 rounded-2xl border border-slate-800 text-xs text-slate-300 space-y-1.5 shadow-xl hidden sm:block">
+      <div className="absolute bottom-4 left-4 z-20 glass-panel p-3.5 rounded-2xl border border-slate-800 text-xs text-slate-300 space-y-1.5 shadow-xl hidden sm:block">
         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
           Legenda do Mapa:
         </span>
+        <div className="flex items-center space-x-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-glow-sky border border-white"></span>
+          <span className="font-medium text-sky-200">Sua Localização (GPS)</span>
+        </div>
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-glow"></span>
           <span>Disponível para Partida</span>
@@ -242,12 +369,15 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
         <div>
           <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center space-x-1">
             <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Quadras em Sete Lagoas</span>
+            <span>Espaços em Sete Lagoas</span>
           </h4>
           
-          <div className="overflow-y-auto max-h-[380px] space-y-2 pr-1">
+          <div className="overflow-y-auto max-h-[420px] space-y-2 pr-1">
             {quadras.map((q) => {
               const selecionada = quadraSelecionada?.id === q.id;
+              const coords = getQuadraCoords(q);
+              const dist = userLocation ? calcularDistanciaKm(userLocation, coords) : null;
+
               return (
                 <div
                   key={q.id}
@@ -258,13 +388,20 @@ export default function MapaQuadras({ quadras, onReservar, onVerChamados }) {
                       : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                   }`}
                 >
-                  <div className="font-bold truncate text-slate-200">{q.nome}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold truncate text-slate-200">{q.nome}</div>
+                    {dist && (
+                      <span className="text-[10px] font-semibold text-sky-400 shrink-0 ml-1">
+                        {dist}
+                      </span>
+                    )}
+                  </div>
                   {q.modalidades && (
                     <div className="text-[10px] text-sky-400 font-medium truncate">{q.modalidades}</div>
                   )}
                   <div className="text-[11px] text-slate-400 flex items-center justify-between mt-1">
                     <span>{q.bairro}</span>
-                    <span className={q.status === 'DISPONIVEL' ? 'text-emerald-400' : 'text-amber-400'}>
+                    <span className={q.status === 'DISPONIVEL' ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>
                       ● {q.status === 'DISPONIVEL' ? 'Livre' : 'Ocupada'}
                     </span>
                   </div>

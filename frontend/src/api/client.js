@@ -77,6 +77,8 @@ export const api = {
         nome: resp.nome,
         email: resp.email,
         role: resp.role,
+        fotoUrl: resp.fotoUrl,
+        objetivo: resp.objetivo,
       });
       return resp;
     },
@@ -125,5 +127,12 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status })
     }),
+  },
+
+  // Perfil de Usuário
+  usuarios: {
+    obterPerfil: () => request('/api/usuarios/perfil'),
+    atualizarPerfil: (dados) => request('/api/usuarios/perfil', { method: 'PUT', body: JSON.stringify(dados) }),
+    atualizarFoto: (formData) => request('/api/usuarios/perfil/foto', { method: 'POST', body: formData }),
   }
 };

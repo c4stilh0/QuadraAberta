@@ -10,6 +10,7 @@ import NovoChamadoModal from './components/NovoChamadoModal';
 import NovaQuadraModal from './components/NovaQuadraModal';
 import MapaQuadras from './components/MapaQuadras';
 import AuthModal from './components/AuthModal';
+import PerfilView from './components/PerfilView';
 import { api, getCurrentUser } from './api/client';
 import { Calendar, Trash2, AlertCircle, LayoutGrid, Map as MapIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
 
@@ -21,7 +22,7 @@ export default function App() {
   const [filtroBairro, setFiltroBairro] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroModalidade, setFiltroModalidade] = useState('');
-  const [modoVisualizacao, setModoVisualizacao] = useState('cards'); // 'cards' | 'mapa'
+  const [modoVisualizacao, setModoVisualizacao] = useState('mapa'); // 'mapa' | 'cards'
   const [sincronizando, setSincronizando] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState(null);
 
@@ -75,6 +76,14 @@ export default function App() {
     api.auth.logout();
     setUser(null);
     setMinhasReservas([]);
+    if (activeTab === 'perfil') {
+      setActiveTab('quadras');
+    }
+  };
+
+  const handleUpdateUser = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('quadraaberta_user', JSON.stringify(updatedUser));
   };
 
   const handleCancelarReserva = async (reservaId) => {
@@ -391,6 +400,13 @@ export default function App() {
                 setNovoChamadoOpen(true);
               }
             }}
+          />
+        )}
+
+        {activeTab === 'perfil' && (
+          <PerfilView
+            user={user}
+            onUpdateUser={handleUpdateUser}
           />
         )}
       </main>

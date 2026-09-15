@@ -1,5 +1,6 @@
 package com.quadraaberta.api.dto;
 
+import com.quadraaberta.api.entity.enums.NivelHabilidade;
 import com.quadraaberta.api.entity.enums.ObjetivoUsuario;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,5 +15,8 @@ public record AtualizarPerfilRequestDTO(
         String telefone,
 
         @NotNull(message = "O objetivo comunitário é obrigatório.")
-        ObjetivoUsuario objetivo
+        ObjetivoUsuario objetivo,
+
+        NivelHabilidade habilidadeDeclarada
 ) {}
+

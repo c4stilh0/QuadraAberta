@@ -134,5 +134,36 @@ export const api = {
     obterPerfil: () => request('/api/usuarios/perfil'),
     atualizarPerfil: (dados) => request('/api/usuarios/perfil', { method: 'PUT', body: JSON.stringify(dados) }),
     atualizarFoto: (formData) => request('/api/usuarios/perfil/foto', { method: 'POST', body: formData }),
+  },
+
+  // Matchmaking & Partidas Abertas
+  partidas: {
+    listar: (params = {}) => {
+      const query = new URLSearchParams();
+      if (params.status) query.append('status', params.status);
+      if (params.esporte) query.append('esporte', params.esporte);
+      const qs = query.toString();
+      return request(`/api/partidas${qs ? `?${qs}` : ''}`);
+    },
+    buscarPorId: (id) => request(`/api/partidas/${id}`),
+    minhas: () => request('/api/partidas/minhas'),
+    criar: (dados) => request('/api/partidas', { method: 'POST', body: JSON.stringify(dados) }),
+    confirmar: (id, dados) => request(`/api/partidas/${id}/confirmar`, { method: 'POST', body: JSON.stringify(dados) }),
+    sair: (id) => request(`/api/partidas/${id}/sair`, { method: 'DELETE' }),
+    escolherQuadra: (id, quadraId) => request(`/api/partidas/${id}/escolher-quadra`, {
+      method: 'POST',
+      body: JSON.stringify({ quadraId })
+    }),
+    cancelar: (id) => request(`/api/partidas/${id}`, { method: 'DELETE' }),
+  },
+
+  // Avaliações, Reputação & Habilidade
+  avaliacoes: {
+    listarColegas: (partidaId) => request(`/api/avaliacoes/partida/${partidaId}/colegas`),
+    enviarAvaliacoes: (partidaId, avaliacoes) => request(`/api/avaliacoes/partida/${partidaId}`, {
+      method: 'POST',
+      body: JSON.stringify({ avaliacoes })
+    }),
+    obterReputacao: (usuarioId) => request(`/api/avaliacoes/usuario/${usuarioId}`)
   }
 };

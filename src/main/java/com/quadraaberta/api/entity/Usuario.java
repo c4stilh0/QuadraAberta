@@ -53,6 +53,34 @@ public class Usuario implements UserDetails {
 
     @Column(nullable = false)
     @Builder.Default
+    private Double reputacao = 5.00;
+
+    @Column(name = "total_avaliacoes_reputacao", nullable = false)
+    @Builder.Default
+    private Integer totalAvaliacoesReputacao = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "habilidade_declarada", nullable = false, length = 30)
+    @Builder.Default
+    private com.quadraaberta.api.entity.enums.NivelHabilidade habilidadeDeclarada = com.quadraaberta.api.entity.enums.NivelHabilidade.JOGADOR_CASUAL;
+
+    @Column(name = "habilidade_validada")
+    private Double habilidadeValidada;
+
+    @Column(name = "total_avaliacoes_habilidade", nullable = false)
+    @Builder.Default
+    private Integer totalAvaliacoesHabilidade = 0;
+
+    @Column(name = "streak_positiva", nullable = false)
+    @Builder.Default
+    private Integer streakPositiva = 0;
+
+    @Column(name = "streak_negativa", nullable = false)
+    @Builder.Default
+    private Integer streakNegativa = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean ativo = true;
 
     @Override

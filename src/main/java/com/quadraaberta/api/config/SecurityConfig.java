@@ -53,8 +53,9 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         
-                        // Leitura pública de quadras e chamados da comunidade
+                        // Leitura pública de quadras, partidas abertas, turmas e chamados
                         .requestMatchers(HttpMethod.GET, "/api/quadras/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/partidas/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/turmas/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/chamados/**").permitAll()
                         

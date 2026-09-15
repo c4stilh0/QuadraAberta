@@ -87,6 +87,9 @@ public class UsuarioService {
             usuario.setTelefone(dto.telefone().trim());
         }
         usuario.setObjetivo(dto.objetivo());
+        if (dto.habilidadeDeclarada() != null) {
+            usuario.setHabilidadeDeclarada(dto.habilidadeDeclarada());
+        }
 
         // Transição de papel baseada no objetivo comunitário (preservando gestor)
         if (usuario.getRole() != com.quadraaberta.api.entity.enums.Role.ROLE_GESTOR) {

@@ -13,7 +13,10 @@ import {
   Dumbbell,
   HeartHandshake,
   Award,
-  Loader2
+  Loader2,
+  Star,
+  Zap,
+  TrendingUp
 } from 'lucide-react';
 import { api } from '../api/client';
 import FotoEnquadramentoModal from './FotoEnquadramentoModal';
@@ -34,6 +37,14 @@ export default function PerfilView({ user, onUpdateUser }) {
   const [fotoUrl, setFotoUrl] = useState('');
   const [role, setRole] = useState('');
   const [objetivo, setObjetivo] = useState('PRATICAR_ESPORTES');
+  const [reputacao, setReputacao] = useState(5.0);
+  const [totalAvaliacoesReputacao, setTotalAvaliacoesReputacao] = useState(0);
+  const [habilidadeDeclarada, setHabilidadeDeclarada] = useState('JOGADOR_CASUAL');
+  const [habilidadeDeclaradaDescricao, setHabilidadeDeclaradaDescricao] = useState('Jogador Casual');
+  const [habilidadeValidada, setHabilidadeValidada] = useState(null);
+  const [habilidadeValidadaDescricao, setHabilidadeValidadaDescricao] = useState(null);
+  const [totalAvaliacoesHabilidade, setTotalAvaliacoesHabilidade] = useState(0);
+  const [nivelConfirmadoPelaComunidade, setNivelConfirmadoPelaComunidade] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -53,6 +64,14 @@ export default function PerfilView({ user, onUpdateUser }) {
       setFotoUrl(perfil.fotoUrl || '');
       setRole(perfil.role || '');
       setObjetivo(perfil.objetivo || 'PRATICAR_ESPORTES');
+      setReputacao(perfil.reputacao != null ? perfil.reputacao : 5.0);
+      setTotalAvaliacoesReputacao(perfil.totalAvaliacoesReputacao || 0);
+      setHabilidadeDeclarada(perfil.habilidadeDeclarada || 'JOGADOR_CASUAL');
+      setHabilidadeDeclaradaDescricao(perfil.habilidadeDeclaradaDescricao || 'Jogador Casual');
+      setHabilidadeValidada(perfil.habilidadeValidada);
+      setHabilidadeValidadaDescricao(perfil.habilidadeValidadaDescricao);
+      setTotalAvaliacoesHabilidade(perfil.totalAvaliacoesHabilidade || 0);
+      setNivelConfirmadoPelaComunidade(!!perfil.nivelConfirmadoPelaComunidade);
     } catch (err) {
       setErro(err.message || 'Erro ao carregar dados do perfil.');
     } finally {
@@ -75,11 +94,14 @@ export default function PerfilView({ user, onUpdateUser }) {
       const atualizado = await api.usuarios.atualizarPerfil({
         nome: nome.trim(),
         telefone: telefone.trim(),
-        objetivo: objetivo
+        objetivo: objetivo,
+        habilidadeDeclarada: habilidadeDeclarada
       });
 
       setRole(atualizado.role);
       setFotoUrl(atualizado.fotoUrl);
+      setHabilidadeDeclarada(atualizado.habilidadeDeclarada);
+      setHabilidadeDeclaradaDescricao(atualizado.habilidadeDeclaradaDescricao);
       setMensagemSucesso('Perfil atualizado com sucesso!');
 
       // Sincroniza estado global do usuário no App e Navbar
@@ -307,6 +329,84 @@ export default function PerfilView({ user, onUpdateUser }) {
               <span className="font-mono text-slate-300">{formatarCpf(cpf)}</span>
             </div>
           </div>
+
+          {/* Card de Reputação Estilo Uber */}
+          <div className="w-full mt-5 pt-4 border-t border-slate-800/80">
+            <div className="p-4 rounded-2xl bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center space-x-1">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  <span>Reputação Fair Play</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Estilo Uber</span>
+              </div>
+
+              <div className="flex items-baseline space-x-2">
+                <span className="text-3xl font-black text-amber-400">
+                  {reputacao.toFixed(1)}
+                </span>
+                <span className="text-xs text-slate-400">/ 5.0</span>
+                <div className="flex items-center space-x-0.5 ml-auto text-amber-400">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-3.5 h-3.5 ${
+                        s <= Math.round(reputacao)
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'text-slate-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 mt-2">
+                {totalAvaliacoesReputacao === 0
+                  ? 'Nota máxima inicial (5.0). Mantenha seu bom comportamento nas partidas comunitárias!'
+                  : `${totalAvaliacoesReputacao} avaliações anônimas recebidas dos colegas de quadra.`}
+              </p>
+
+              <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center space-x-1.5 text-[10px] text-emerald-400 font-semibold">
+                <Shield className="w-3 h-3" />
+                <span>Amortecimento dinâmico de streak ativo</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card de Habilidade Comunitária */}
+          <div className="w-full mt-3">
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400 flex items-center space-x-1">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>Nível de Habilidade</span>
+                </span>
+                {nivelConfirmadoPelaComunidade && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    ✓ Validado
+                  </span>
+                )}
+              </div>
+
+              <div className="text-sm font-bold text-white mb-1">
+                {habilidadeDeclaradaDescricao}
+              </div>
+
+              <div className="text-[11px] text-slate-400">
+                {nivelConfirmadoPelaComunidade ? (
+                  <span className="text-emerald-300 font-medium">
+                    Confirmado pelos colegas de time com média de {habilidadeValidada?.toFixed(1)}/4.0 ({totalAvaliacoesHabilidade} votos).
+                  </span>
+                ) : totalAvaliacoesHabilidade > 0 ? (
+                  <span>
+                    Em validação pelos pares: média atual de {habilidadeValidada?.toFixed(1)}/4.0 ({totalAvaliacoesHabilidade} {totalAvaliacoesHabilidade === 1 ? 'voto' : 'votos'}).
+                  </span>
+                ) : (
+                  <span>Aguardando avaliações dos colegas em partidas para validação de categoria.</span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Coluna Direita: Formulário de Dados e Escolha de Objetivo */}
@@ -384,6 +484,105 @@ export default function PerfilView({ user, onUpdateUser }) {
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-400 cursor-not-allowed"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* SELEÇÃO DA AUTOAVALIAÇÃO DE HABILIDADE TÉCNICA (4 NÍVEIS) */}
+            <div className="pt-4 border-t border-slate-800">
+              <div className="mb-3">
+                <div className="flex items-center space-x-2">
+                  <Award className="w-4 h-4 text-sky-400" />
+                  <label className="block text-sm font-bold text-white">
+                    Autoavaliação de Habilidade Esportiva
+                  </label>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Como você se classifica tecnicamente? Outros jogadores validarão sua categoria de forma anônima após as partidas.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                {/* 1. Iniciante */}
+                <div
+                  onClick={() => setHabilidadeDeclarada('JOGADOR_INICIANTE')}
+                  className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                    habilidadeDeclarada === 'JOGADOR_INICIANTE'
+                      ? 'bg-sky-950/40 border-sky-500 shadow-md shadow-sky-950/40'
+                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Jogador Iniciante</span>
+                    {habilidadeDeclarada === 'JOGADOR_INICIANTE' && (
+                      <CheckCircle2 className="w-4 h-4 text-sky-400" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Dando os primeiros passos, aprendendo os fundamentos e regras básicas da modalidade.
+                  </p>
+                </div>
+
+                {/* 2. Casual */}
+                <div
+                  onClick={() => setHabilidadeDeclarada('JOGADOR_CASUAL')}
+                  className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                    habilidadeDeclarada === 'JOGADOR_CASUAL'
+                      ? 'bg-emerald-950/40 border-emerald-500 shadow-md shadow-emerald-950/40'
+                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Jogador Casual</span>
+                    {habilidadeDeclarada === 'JOGADOR_CASUAL' && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Joga por pura diversão e saúde, em ritmo leve e descontraído, sem compromisso competitivo.
+                  </p>
+                </div>
+
+                {/* 3. Amador */}
+                <div
+                  onClick={() => setHabilidadeDeclarada('JOGADOR_AMADOR')}
+                  className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                    habilidadeDeclarada === 'JOGADOR_AMADOR'
+                      ? 'bg-amber-950/40 border-amber-500 shadow-md shadow-amber-950/40'
+                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Jogador Amador</span>
+                    {habilidadeDeclarada === 'JOGADOR_AMADOR' && (
+                      <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Domina os fundamentos, possui boa intensidade física, noção tática e bom ritmo de jogo.
+                  </p>
+                </div>
+
+                {/* 4. Profissional */}
+                <div
+                  onClick={() => setHabilidadeDeclarada('JOGADOR_PROFISSIONAL')}
+                  className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                    habilidadeDeclarada === 'JOGADOR_PROFISSIONAL'
+                      ? 'bg-purple-950/40 border-purple-500 shadow-md shadow-purple-950/40'
+                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Jogador Profissional</span>
+                    {habilidadeDeclarada === 'JOGADOR_PROFISSIONAL' && (
+                      <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Alto rendimento técnico, experiência federada, histórico em torneios ou atleta semiprofissional.
+                  </p>
+                </div>
+
               </div>
             </div>
 

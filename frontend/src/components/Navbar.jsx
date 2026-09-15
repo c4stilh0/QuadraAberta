@@ -43,8 +43,8 @@ export default function Navbar({ activeTab, setActiveTab, user, onOpenAuth, onLo
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
             >
-              <Calendar className="w-4 h-4" />
-              <span>Quadras & Reservas</span>
+              <Trophy className="w-4 h-4" />
+              <span>Partidas & Matchmaking</span>
             </button>
 
             <button
@@ -151,8 +151,8 @@ export default function Navbar({ activeTab, setActiveTab, user, onOpenAuth, onLo
             activeTab === 'quadras' ? 'text-emerald-400 font-semibold' : 'text-slate-400'
           }`}
         >
-          <Calendar className="w-4 h-4 mb-1" />
-          <span>Quadras</span>
+          <Trophy className="w-4 h-4 mb-1" />
+          <span>Partidas</span>
         </button>
         <button
           onClick={() => setActiveTab('turmas')}

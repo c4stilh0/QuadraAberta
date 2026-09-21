@@ -127,4 +127,11 @@ public class UsuarioService {
         return usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado com o e-mail: " + email));
     }
+
+    @Transactional
+    public void redefinirSenha(com.quadraaberta.api.dto.RedefinirSenhaRequestDTO dto) {
+        Usuario usuario = buscarPorEmail(dto.email().trim().toLowerCase());
+        usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
+        usuarioRepository.save(usuario);
+    }
 }

@@ -55,7 +55,8 @@ public class SecurityConfig {
                         
                         // Leitura pública de quadras, partidas abertas, turmas e chamados
                         .requestMatchers(HttpMethod.GET, "/api/quadras/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/partidas/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/partidas/minhas").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/partidas", "/api/partidas/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/turmas/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/chamados/**").permitAll()
                         
@@ -75,12 +76,18 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+                            boolean expirado = Boolean.TRUE.equals(request.getAttribute("jwt_expired"));
+                            if (expirado) {
+                                response.setHeader("X-Token-Expired", "true");
+                            }
                             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                                     HttpStatus.UNAUTHORIZED,
-                                    "Acesso não autorizado. Token JWT ausente ou inválido."
+                                    expirado 
+                                            ? "Sua sessão expirou. Por favor, realize o login novamente."
+                                            : "Acesso não autorizado. Token JWT ausente ou inválido."
                             );
-                            problem.setTitle("Não Autorizado");
-                            problem.setType(URI.create("https://quadraaberta.com.br/erros/nao-autorizado"));
+                            problem.setTitle(expirado ? "Sessão Expirada" : "Não Autorizado");
+                            problem.setType(URI.create(expirado ? "https://quadraaberta.com.br/erros/sessao-expirada" : "https://quadraaberta.com.br/erros/nao-autorizado"));
                             response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
@@ -123,9 +130,17 @@ public class SecurityConfig {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
-        configuration.setAllowedOrigins(origins);
+        List<String> patterns = new java.util.ArrayList<>(origins);
+        patterns.add("http://localhost:*");
+        patterns.add("http://127.0.0.1:*");
+        patterns.add("http://[::1]:*");
+        patterns.add("https://*.vercel.app");
+        patterns.add("http://*.vercel.app");
+
+        configuration.setAllowedOriginPatterns(patterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "*"));
+        configuration.setExposedHeaders(List.of("Authorization", "X-Token-Expired"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

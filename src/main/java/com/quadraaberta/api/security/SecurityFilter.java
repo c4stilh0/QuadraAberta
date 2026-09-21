@@ -42,6 +42,8 @@ public class SecurityFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     }
                 });
+            } else if (tokenService.isTokenExpirado(token)) {
+                request.setAttribute("jwt_expired", true);
             }
         }
 

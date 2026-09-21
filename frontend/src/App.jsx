@@ -14,15 +14,19 @@ import PerfilView from './components/PerfilView';
 import NovaPartidaModal, { ESPORTES_CONFIG, BAIRROS_SETE_LAGOAS } from './components/NovaPartidaModal';
 import PartidaDetalhesModal from './components/PartidaDetalhesModal';
 import PartidaCard from './components/PartidaCard';
-import { api, getCurrentUser } from './api/client';
+import { 
+  api, getCurrentUser, isTokenExpired, triggerAutoLogout, setupTokenWatcher, stopTokenWatcher 
+} from './api/client';
 import { 
   Calendar, Trash2, AlertCircle, LayoutGrid, Map as MapIcon, 
-  RefreshCw, CheckCircle2, PlusCircle, Users, Trophy, Sparkles, ChevronRight, Flame
+  RefreshCw, CheckCircle2, PlusCircle, Users, Trophy, Sparkles, ChevronRight, Flame,
+  AlertTriangle, X
 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('quadras'); // 'quadras' funciona agora como Partidas & Matchmaking
   const [user, setUser] = useState(() => getCurrentUser());
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState(null);
   
   // Estado das Quadras
   const [quadras, setQuadras] = useState([]);
@@ -127,6 +131,50 @@ export default function App() {
     }
   }, [user, carregarMinhasPartidas, carregarMinhasReservas]);
 
+  // Monitora a expiração da sessão do usuário e efetua logout automático
+  useEffect(() => {
+    const handleSessionExpired = (event) => {
+      const msg = event?.detail?.message || 'Sua sessão expirou. Você foi desconectado automaticamente.';
+      setUser(null);
+      setMinhasReservas([]);
+      setMinhasPartidas([]);
+      setActiveTab((prev) => (prev === 'perfil' ? 'quadras' : prev));
+      setSessionExpiredMsg(msg);
+      setTimeout(() => setSessionExpiredMsg(null), 10000);
+    };
+
+    window.addEventListener('quadraaberta:session-expired', handleSessionExpired);
+
+    if (user) {
+      setupTokenWatcher(() => {
+        handleSessionExpired({
+          detail: { message: 'Sua sessão expirou por segurança. Faça login novamente para continuar.' }
+        });
+      });
+
+      const handleFocusOrVisibility = () => {
+        if (isTokenExpired()) {
+          triggerAutoLogout('Sua sessão expirou enquanto você estava fora. Faça login novamente.');
+        }
+      };
+
+      window.addEventListener('focus', handleFocusOrVisibility);
+      document.addEventListener('visibilitychange', handleFocusOrVisibility);
+
+      return () => {
+        window.removeEventListener('quadraaberta:session-expired', handleSessionExpired);
+        window.removeEventListener('focus', handleFocusOrVisibility);
+        document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+        stopTokenWatcher();
+      };
+    }
+
+    return () => {
+      window.removeEventListener('quadraaberta:session-expired', handleSessionExpired);
+      stopTokenWatcher();
+    };
+  }, [user]);
+
   // Atualiza detalhes da partida ativa se aberta no modal
   const handleAtualizarPartidaAtiva = async () => {
     await carregarPartidas();
@@ -142,10 +190,12 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    stopTokenWatcher();
     api.auth.logout();
     setUser(null);
     setMinhasReservas([]);
     setMinhasPartidas([]);
+    setSessionExpiredMsg(null);
     if (activeTab === 'perfil') {
       setActiveTab('quadras');
     }
@@ -656,6 +706,43 @@ export default function App() {
           onClose={() => setNovaQuadraOpen(false)}
           onSuccess={() => carregarQuadras()}
         />
+      )}
+
+      {/* Notificação Flutuante de Sessão Expirada */}
+      {sessionExpiredMsg && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full p-4 rounded-2xl bg-slate-900/95 border border-amber-500/40 text-amber-200 shadow-2xl backdrop-blur-md flex items-start space-x-3 animate-slide-up">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 text-xs">
+            <p className="font-bold text-amber-300 text-sm mb-1">Sessão Expirada</p>
+            <p className="text-slate-300 leading-relaxed">{sessionExpiredMsg}</p>
+            <div className="mt-3 flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  setSessionExpiredMsg(null);
+                  setAuthModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-glow transition-all"
+              >
+                Entrar Novamente
+              </button>
+              <button
+                onClick={() => setSessionExpiredMsg(null)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-colors"
+              >
+                Dispensar
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => setSessionExpiredMsg(null)}
+            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors shrink-0"
+            title="Fechar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
     </div>

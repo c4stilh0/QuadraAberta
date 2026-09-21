@@ -1,5 +1,89 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+// Decodifica o payload de um token JWT em Base64Url de forma segura com suporte UTF-8
+export function parseJwt(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+// Verifica se um token JWT já expirou (com margem de segurança de 5 segundos)
+export function isTokenExpired(token = getToken()) {
+  if (!token) return true;
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return true;
+  return Date.now() >= (payload.exp * 1000) - 5000;
+}
+
+// Retorna quantos milissegundos restam até o token expirar
+export function getTokenRemainingMs(token = getToken()) {
+  if (!token) return 0;
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return 0;
+  const remaining = (payload.exp * 1000) - Date.now();
+  return remaining > 0 ? remaining : 0;
+}
+
+let tokenExpirationTimer = null;
+
+// Executa o logout automático e notifica toda a aplicação
+export function triggerAutoLogout(message = 'Sua sessão expirou. Você foi desconectado automaticamente.') {
+  clearTimeout(tokenExpirationTimer);
+  tokenExpirationTimer = null;
+  setToken(null);
+  setCurrentUser(null);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('quadraaberta:session-expired', {
+        detail: { message }
+      })
+    );
+  }
+}
+
+// Inicia um monitor de expiração com timer preciso para disparar o logout no segundo exato da expiração
+export function setupTokenWatcher(onExpiredCallback) {
+  clearTimeout(tokenExpirationTimer);
+  tokenExpirationTimer = null;
+
+  const token = getToken();
+  if (!token) return;
+
+  if (isTokenExpired(token)) {
+    triggerAutoLogout();
+    onExpiredCallback?.('Sua sessão expirou.');
+    return;
+  }
+
+  const msRemaining = getTokenRemainingMs(token);
+  // Limita o timeout ao valor máximo seguro de setTimeout (~24.8 dias)
+  const safeMs = Math.min(msRemaining, 2147483647);
+
+  tokenExpirationTimer = setTimeout(() => {
+    triggerAutoLogout();
+    onExpiredCallback?.('Sua sessão expirou.');
+  }, safeMs);
+}
+
+export function stopTokenWatcher() {
+  clearTimeout(tokenExpirationTimer);
+  tokenExpirationTimer = null;
+}
+
 export function getToken() {
   return localStorage.getItem('quadraaberta_token');
 }
@@ -7,12 +91,23 @@ export function getToken() {
 export function setToken(token) {
   if (token) {
     localStorage.setItem('quadraaberta_token', token);
+    setupTokenWatcher();
   } else {
     localStorage.removeItem('quadraaberta_token');
+    stopTokenWatcher();
   }
 }
 
 export function getCurrentUser() {
+  const token = getToken();
+  if (!token || isTokenExpired(token)) {
+    if (token) {
+      localStorage.removeItem('quadraaberta_token');
+      localStorage.removeItem('quadraaberta_user');
+      stopTokenWatcher();
+    }
+    return null;
+  }
   const userJson = localStorage.getItem('quadraaberta_user');
   if (!userJson) return null;
   try {
@@ -33,8 +128,16 @@ export function setCurrentUser(user) {
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const headers = { ...options.headers };
+  const isAuthEndpoint = endpoint.startsWith('/api/auth/');
 
   const token = getToken();
+
+  // Se o token existe mas já expirou antes do envio de uma requisição protegida
+  if (token && isTokenExpired(token) && !isAuthEndpoint) {
+    triggerAutoLogout('Sua sessão expirou. Faça login novamente para continuar.');
+    throw new Error('Sua sessão expirou. Faça login novamente para continuar.');
+  }
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -49,7 +152,22 @@ async function request(endpoint, options = {}) {
     headers,
   };
 
-  const response = await fetch(url, config);
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (networkError) {
+    throw new Error('Não foi possível conectar ao servidor da API (porta 8080). Verifique se o backend está em execução.');
+  }
+
+  // Se a API retornar 401 Unauthorized em endpoint protegido, a sessão expirou ou é inválida
+  if (response.status === 401 && !isAuthEndpoint) {
+    const expiredHeader = response.headers.get('X-Token-Expired');
+    const msg = expiredHeader === 'true'
+      ? 'Sua sessão expirou. Você foi desconectado automaticamente por segurança.'
+      : 'Sessão inválida ou expirada. Faça login novamente.';
+    triggerAutoLogout(msg);
+    throw new Error(msg);
+  }
 
   if (response.status === 204) {
     return null;
@@ -58,7 +176,13 @@ async function request(endpoint, options = {}) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const errorMessage = data?.detail || data?.title || 'Ocorreu um erro ao processar a requisição.';
+    let errorMessage = data?.detail || data?.title || 'Ocorreu um erro ao processar a requisição.';
+    if (data?.erros && typeof data.erros === 'object') {
+      const fieldErrors = Object.values(data.erros).join('; ');
+      if (fieldErrors) {
+        errorMessage = `${errorMessage}: ${fieldErrors}`;
+      }
+    }
     throw new Error(errorMessage);
   }
 
@@ -69,6 +193,7 @@ export const api = {
   // Autenticação
   auth: {
     cadastrar: (dados) => request('/api/auth/cadastrar', { method: 'POST', body: JSON.stringify(dados) }),
+    redefinirSenha: (dados) => request('/api/auth/redefinir-senha', { method: 'POST', body: JSON.stringify(dados) }),
     login: async (dados) => {
       const resp = await request('/api/auth/login', { method: 'POST', body: JSON.stringify(dados) });
       setToken(resp.token);
@@ -85,6 +210,14 @@ export const api = {
     logout: () => {
       setToken(null);
       setCurrentUser(null);
+    },
+    checkSession: () => {
+      const token = getToken();
+      if (!token || isTokenExpired(token)) {
+        if (token) triggerAutoLogout();
+        return false;
+      }
+      return true;
     }
   },
 

@@ -74,11 +74,16 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    @ExceptionHandler(BadCredentialsException.class)
-    public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
+    @ExceptionHandler({
+            BadCredentialsException.class,
+            org.springframework.security.core.userdetails.UsernameNotFoundException.class,
+            org.springframework.security.authentication.InternalAuthenticationServiceException.class,
+            org.springframework.security.core.AuthenticationException.class
+    })
+    public ProblemDetail handleBadCredentials(Exception ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNAUTHORIZED,
-                "Credenciais inválidas. Verifique seu e-mail e senha."
+                "E-mail ou senha incorretos. Verifique suas credenciais ou cadastre-se na aba 'Criar Conta'."
         );
         problem.setTitle("Credenciais Inválidas");
         problem.setType(URI.create("https://quadraaberta.com.br/erros/credenciais-invalidas"));

@@ -56,4 +56,30 @@ public class TokenService {
             return null;
         }
     }
+
+    public boolean isTokenExpirado(String token) {
+        try {
+            Jwts.parser()
+                    .verifyWith(chaveAssinatura)
+                    .build()
+                    .parseSignedClaims(token);
+            return false;
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return true;
+        } catch (Exception e) {
+            try {
+                String[] split = token.split("\\.");
+                if (split.length == 3) {
+                    String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(split[1]), StandardCharsets.UTF_8);
+                    com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(payloadJson);
+                    if (node.has("exp")) {
+                        long expSec = node.get("exp").asLong();
+                        return Instant.now().getEpochSecond() >= expSec;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            return false;
+        }
+    }
 }

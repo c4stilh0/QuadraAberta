@@ -37,4 +37,11 @@ public class AuthController {
         LoginResponseDTO response = usuarioService.autenticar(dto);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/redefinir-senha")
+    @Operation(summary = "Redefinir senha de usuário", description = "Permite alterar a senha informando o e-mail cadastrado e a nova senha.")
+    public ResponseEntity<Void> redefinirSenha(@RequestBody @Valid com.quadraaberta.api.dto.RedefinirSenhaRequestDTO dto) {
+        usuarioService.redefinirSenha(dto);
+        return ResponseEntity.ok().build();
+    }
 }

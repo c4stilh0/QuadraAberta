@@ -49,6 +49,9 @@ public class PartidaController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Listar partidas que o usuário logado criou ou confirmou presença")
     public ResponseEntity<List<PartidaResponseDTO>> listarMinhasPartidas(@AuthenticationPrincipal Usuario usuarioLogado) {
+        if (usuarioLogado == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         List<PartidaResponseDTO> partidas = matchmakingService.listarMinhasPartidas(usuarioLogado.getId());
         return ResponseEntity.ok(partidas);
     }

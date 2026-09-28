@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Users, MapPin, Calendar, Clock, Trophy, CheckCircle2, 
   AlertCircle, ShieldCheck, ArrowRight, Navigation, Sparkles, LogOut, Check,
-  Star, Award
+  Star, Award, MessageSquare, Send
 } from 'lucide-react';
 import { api } from '../api/client';
 import { BAIRROS_SETE_LAGOAS, BAIRROS_COORDS, ESPORTES_CONFIG } from './NovaPartidaModal';
@@ -13,8 +13,10 @@ export default function PartidaDetalhesModal({
   user, 
   onClose, 
   onAtualizar, 
+  onPartidaCancelada,
   onAbrirAuth 
 }) {
+  const [activeModalTab, setActiveModalTab] = useState('detalhes'); // 'detalhes' | 'chat'
   const [bairroParticipante, setBairroParticipante] = useState('Progresso');
   const [gpsParticipante, setGpsParticipante] = useState(null);
   const [obtendoGps, setObtendoGps] = useState(false);
@@ -22,6 +24,13 @@ export default function PartidaDetalhesModal({
   const [feedbackMsg, setFeedbackMsg] = useState(null);
   const [erroMsg, setErroMsg] = useState(null);
   const [mostrarModalAvaliacao, setMostrarModalAvaliacao] = useState(false);
+
+  // Estados do Bate-Papo da Partida
+  const [mensagens, setMensagens] = useState([]);
+  const [novaMensagem, setNovaMensagem] = useState('');
+  const [enviandoMensagem, setEnviandoMensagem] = useState(false);
+  const [erroChat, setErroChat] = useState(null);
+  const chatBottomRef = useRef(null);
 
   if (!partida) return null;
 
@@ -61,6 +70,59 @@ export default function PartidaDetalhesModal({
   const sugestoes = partida.sugestoesQuadras || partida.top3QuadrasSugeridas || [];
   const quadraEscolhida = partida.quadraEscolhida || partida.quadraDefinida;
   const tituloPartida = partida.titulo || partida.descricao || `Partida de ${esporteCfg.label}`;
+
+  // Carrega mensagens do chat e mantém polling ativo enquanto modal estiver aberto
+  const carregarMensagens = async (silencioso = false) => {
+    if (!partida?.id) return;
+    try {
+      const data = await api.partidas.listarMensagens(partida.id);
+      setMensagens(data || []);
+      if (!silencioso) {
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
+    } catch (err) {
+      if (!silencioso) {
+        console.warn('Erro ao carregar mensagens:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    carregarMensagens(false);
+    const interval = setInterval(() => {
+      carregarMensagens(true);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [partida?.id]);
+
+  useEffect(() => {
+    if (activeModalTab === 'chat') {
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    }
+  }, [activeModalTab, mensagens.length]);
+
+  const handleEnviarMensagem = async (textoParaEnviar) => {
+    const texto = (typeof textoParaEnviar === 'string' ? textoParaEnviar : novaMensagem).trim();
+    if (!texto) return;
+
+    if (!user) {
+      onAbrirAuth?.();
+      return;
+    }
+
+    try {
+      setEnviandoMensagem(true);
+      setErroChat(null);
+      const msgCriada = await api.partidas.enviarMensagem(partida.id, { conteudo: texto });
+      setMensagens((prev) => [...prev, msgCriada]);
+      setNovaMensagem('');
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    } catch (err) {
+      setErroChat(err.message || 'Erro ao enviar mensagem.');
+    } finally {
+      setEnviandoMensagem(false);
+    }
+  };
 
   const handleObterGps = () => {
     if (!('geolocation' in navigator)) {
@@ -121,12 +183,25 @@ export default function PartidaDetalhesModal({
     try {
       setLoadingAcao(true);
       setErroMsg(null);
-      await api.partidas.sair(partida.id);
+      const res = await api.partidas.sair(partida.id);
       setFeedbackMsg('Você saiu da partida.');
-      onAtualizar?.();
+      if (res?.status === 'CANCELADA' || isCriador) {
+        if (onPartidaCancelada) {
+          onPartidaCancelada(partida.id);
+        } else {
+          onAtualizar?.();
+          onClose();
+        }
+      } else {
+        if (onPartidaCancelada) {
+          onPartidaCancelada(partida.id);
+        } else {
+          onAtualizar?.();
+          onClose();
+        }
+      }
     } catch (err) {
       setErroMsg(err.message || 'Erro ao sair da partida.');
-    } finally {
       setLoadingAcao(false);
     }
   };
@@ -155,10 +230,12 @@ export default function PartidaDetalhesModal({
       setErroMsg(null);
       await api.partidas.cancelar(partida.id);
       setFeedbackMsg('Partida cancelada com sucesso.');
-      setTimeout(() => {
+      if (onPartidaCancelada) {
+        onPartidaCancelada(partida.id);
+      } else {
         onAtualizar?.();
         onClose();
-      }, 1000);
+      }
     } catch (err) {
       setErroMsg(err.message || 'Erro ao cancelar partida.');
       setLoadingAcao(false);
@@ -238,6 +315,43 @@ export default function PartidaDetalhesModal({
           </div>
         )}
 
+        {/* Abas do Modal: Lobby & Centróide / Bate-Papo da Partida */}
+        <div className="flex rounded-2xl bg-slate-900/90 p-1 mb-5 border border-slate-800">
+          <button
+            type="button"
+            onClick={() => setActiveModalTab('detalhes')}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${
+              activeModalTab === 'detalhes'
+                ? 'bg-emerald-600 text-white shadow-glow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Lobby & Centróide</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveModalTab('chat')}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${
+              activeModalTab === 'chat'
+                ? 'bg-emerald-600 text-white shadow-glow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Bate-Papo da Partida</span>
+            {mensagens.length > 0 && (
+              <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeModalTab === 'chat' ? 'bg-white text-emerald-800' : 'bg-emerald-500/20 text-emerald-300'
+              }`}>
+                {mensagens.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeModalTab === 'detalhes' && (
+          <>
         {/* Bloco de Localização & Privacidade Geográfica */}
         <div className="mb-6 p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
           <div className="flex items-center justify-between mb-2">
@@ -585,6 +699,182 @@ export default function PartidaDetalhesModal({
             Fechar
           </button>
         </div>
+        </>
+        )}
+
+        {/* Painel do Bate-Papo da Partida */}
+        {activeModalTab === 'chat' && (
+          <div className="flex flex-col space-y-3 animate-fade-in">
+            {/* Cabeçalho do Bate-Papo */}
+            <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="font-semibold text-slate-200">Bate-Papo do Jogo</span>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                {isParticipante || isCriador ? '🟢 Presença confirmada no jogo' : '🔒 Somente leitura (confirme presença)'}
+              </span>
+            </div>
+
+            {/* Erro no Chat */}
+            {erroChat && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{erroChat}</span>
+              </div>
+            )}
+
+            {/* Feed de Mensagens com rolagem suave */}
+            <div className="h-[360px] overflow-y-auto pr-1 space-y-3 bg-slate-950/60 rounded-2xl p-3 border border-slate-800/80">
+              {mensagens.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
+                    <MessageSquare className="w-6 h-6 text-emerald-400/80" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-300 mb-1">Nenhuma mensagem ainda</p>
+                  <p className="text-xs text-slate-400 max-w-xs">
+                    Seja o primeiro a mandar um oi, combinar quem leva a bola ou a cor dos coletes!
+                  </p>
+                </div>
+              ) : (
+                mensagens.map((msg) => {
+                  const hora = msg.criadoEm
+                    ? new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                    : '';
+
+                  if (msg.tipo === 'SISTEMA') {
+                    return (
+                      <div key={msg.id} className="flex items-center justify-center my-2">
+                        <span className="text-[11px] px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-slate-400 flex items-center space-x-1.5 shadow-sm text-center">
+                          <Sparkles className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>{msg.conteudo}</span>
+                          <span className="text-[9px] text-slate-500 ml-1 font-mono">{hora}</span>
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  if (msg.souEu) {
+                    return (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="max-w-[80%] rounded-2xl rounded-tr-none px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md">
+                          <p className="text-xs break-words leading-relaxed">{msg.conteudo}</p>
+                          <span className="text-[9px] text-emerald-200/80 block text-right mt-1 font-mono">{hora}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className="flex items-start space-x-2.5 max-w-[85%]">
+                      <div className="w-7 h-7 rounded-full bg-slate-800 ring-1 ring-slate-700 overflow-hidden flex items-center justify-center shrink-0 mt-0.5 shadow">
+                        {msg.fotoUrl ? (
+                          <img src={msg.fotoUrl} alt={msg.nomeUsuario} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-300">
+                            {msg.nomeUsuario ? msg.nomeUsuario.charAt(0).toUpperCase() : '?'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="rounded-2xl rounded-tl-none px-3.5 py-2.5 bg-slate-900 border border-slate-800 text-slate-200 shadow-sm flex-1">
+                        <div className="flex items-center justify-between space-x-2 mb-1">
+                          <span className="text-[11px] font-bold text-slate-300">{msg.nomeUsuario}</span>
+                          {msg.isCriador && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              👑 Organizador
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs break-words leading-relaxed text-slate-200">{msg.conteudo}</p>
+                        <span className="text-[9px] text-slate-500 block text-right mt-1 font-mono">{hora}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Atalhos Rápidos de 1 Clique */}
+            {(isParticipante || isCriador) && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Atalhos Rápidos:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    '⚽ Levo a bola!',
+                    '🎽 Levo os coletes!',
+                    '⏱️ Chego 10min antes!',
+                    '🧤 Jogo no gol!',
+                    '🚗 Alguém precisa de carona?'
+                  ].map((atalho) => (
+                    <button
+                      key={atalho}
+                      type="button"
+                      onClick={() => handleEnviarMensagem(atalho)}
+                      disabled={enviandoMensagem}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-300 hover:border-emerald-500/40 hover:bg-slate-800 transition-all disabled:opacity-50"
+                    >
+                      {atalho}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Caixa de Entrada e Envio */}
+            {(isParticipante || isCriador) ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleEnviarMensagem();
+                }}
+                className="flex items-center space-x-2 pt-2"
+              >
+                <input
+                  type="text"
+                  maxLength={500}
+                  value={novaMensagem}
+                  onChange={(e) => setNovaMensagem(e.target.value)}
+                  placeholder="Escreva uma mensagem para a partida..."
+                  disabled={enviandoMensagem}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!novaMensagem.trim() || enviandoMensagem}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow transition-all flex items-center justify-center space-x-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{enviandoMensagem ? 'Enviando...' : 'Enviar'}</span>
+                </button>
+              </form>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <p className="text-xs text-slate-400">
+                  Quer combinar os detalhes do jogo?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setActiveModalTab('detalhes')}
+                    className="text-emerald-400 hover:underline font-bold"
+                  >
+                    Confirme sua presença no lobby
+                  </button>{' '}
+                  para liberar o envio de mensagens!
+                </p>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 

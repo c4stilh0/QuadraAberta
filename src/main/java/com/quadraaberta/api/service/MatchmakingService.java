@@ -26,6 +26,7 @@ public class MatchmakingService {
 
     private final PartidaMatchRepository partidaRepository;
     private final QuadraRepository quadraRepository;
+    private final ChatPartidaService chatPartidaService;
 
     @Transactional
     public PartidaResponseDTO criarPartida(Usuario criador, CriarPartidaRequestDTO dto) {
@@ -63,6 +64,8 @@ public class MatchmakingService {
 
         log.info("Nova partida de {} criada pelo usuário '{}' em {}",
                 salva.getEsporte(), criador.getNome(), salva.getBairroCriador());
+
+        chatPartidaService.enviarMensagemSistema(salva.getId(), "Partida criada por " + criador.getNome() + "! Aguardando quórum.");
 
         List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(salva);
         return PartidaResponseDTO.fromEntity(salva, top3, criador.getId());
@@ -104,6 +107,8 @@ public class MatchmakingService {
         log.info("Usuário '{}' confirmou presença na partida #{} ({})",
                 usuario.getNome(), partida.getId(), partida.getEsporte());
 
+        chatPartidaService.enviarMensagemSistema(partida.getId(), usuario.getNome() + " confirmou presença!");
+
         List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(atualizada);
         return PartidaResponseDTO.fromEntity(atualizada, top3, usuario.getId());
     }
@@ -115,6 +120,7 @@ public class MatchmakingService {
         if (partida.getCriador().getId().equals(usuario.getId()) && partida.getParticipantes().size() <= 1) {
             partida.setStatus(StatusPartida.CANCELADA);
             PartidaMatch cancelada = partidaRepository.save(partida);
+            chatPartidaService.enviarMensagemSistema(partidaId, "Partida cancelada pelo criador.");
             return PartidaResponseDTO.fromEntity(cancelada, List.of(), usuario.getId());
         }
 
@@ -125,6 +131,8 @@ public class MatchmakingService {
 
         recalcularCentroide(partida);
         PartidaMatch atualizada = partidaRepository.save(partida);
+
+        chatPartidaService.enviarMensagemSistema(partidaId, usuario.getNome() + " saiu da partida.");
 
         List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(atualizada);
         return PartidaResponseDTO.fromEntity(atualizada, top3, usuario.getId());
@@ -152,14 +160,23 @@ public class MatchmakingService {
         log.info("Criador '{}' escolheu a quadra '{}' para a partida #{}",
                 usuario.getNome(), quadra.getNome(), partida.getId());
 
+        chatPartidaService.enviarMensagemSistema(partidaId, "Local oficial fixado: " + quadra.getNome() + "!");
+
         List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(atualizada);
         return PartidaResponseDTO.fromEntity(atualizada, top3, usuario.getId());
     }
 
     @Transactional(readOnly = true)
     public List<PartidaResponseDTO> listarPartidasAtivas(String esporteFiltro, Long usuarioAutenticadoId) {
+        return listarPartidasAtivas(esporteFiltro, null, usuarioAutenticadoId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PartidaResponseDTO> listarPartidasAtivas(String esporteFiltro, StatusPartida statusFiltro, Long usuarioAutenticadoId) {
         LocalDateTime limite = LocalDateTime.now().minusHours(3);
-        List<StatusPartida> statusAtivos = List.of(StatusPartida.BUSCANDO_JOGADORES, StatusPartida.QUADRA_DEFINIDA);
+        List<StatusPartida> statusAtivos = (statusFiltro != null && statusFiltro != StatusPartida.CANCELADA)
+                ? List.of(statusFiltro)
+                : List.of(StatusPartida.BUSCANDO_JOGADORES, StatusPartida.QUADRA_DEFINIDA);
 
         List<PartidaMatch> partidas = partidaRepository.buscarPartidasAtivas(statusAtivos, limite);
 
@@ -186,7 +203,8 @@ public class MatchmakingService {
 
     @Transactional(readOnly = true)
     public List<PartidaResponseDTO> listarMinhasPartidas(Long usuarioId) {
-        List<PartidaMatch> minhas = partidaRepository.findMinhasPartidas(usuarioId);
+        List<StatusPartida> statusAtivos = List.of(StatusPartida.BUSCANDO_JOGADORES, StatusPartida.QUADRA_DEFINIDA);
+        List<PartidaMatch> minhas = partidaRepository.findMinhasPartidas(usuarioId, statusAtivos);
         return minhas.stream()
                 .map(p -> {
                     List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(p);
@@ -203,6 +221,7 @@ public class MatchmakingService {
         }
         partida.setStatus(StatusPartida.CANCELADA);
         partidaRepository.save(partida);
+        chatPartidaService.enviarMensagemSistema(partidaId, "Partida cancelada pelo organizador.");
         log.info("Partida #{} cancelada pelo usuário '{}'", partidaId, usuario.getNome());
     }
 

@@ -288,6 +288,11 @@ export const api = {
       body: JSON.stringify({ quadraId })
     }),
     cancelar: (id) => request(`/api/partidas/${id}`, { method: 'DELETE' }),
+    listarMensagens: (id) => request(`/api/partidas/${id}/mensagens`),
+    enviarMensagem: (id, dados) => request(`/api/partidas/${id}/mensagens`, {
+      method: 'POST',
+      body: JSON.stringify(dados)
+    }),
   },
 
   // Avaliações, Reputação & Habilidade

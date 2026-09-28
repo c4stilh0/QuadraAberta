@@ -56,7 +56,7 @@ public class SecurityConfig {
                         // Leitura pública de quadras, partidas abertas, turmas e chamados
                         .requestMatchers(HttpMethod.GET, "/api/quadras/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/partidas/minhas").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/partidas", "/api/partidas/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/partidas", "/api/partidas/{id}", "/api/partidas/{partidaId}/mensagens").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/turmas/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/chamados/**").permitAll()
                         

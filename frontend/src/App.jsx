@@ -84,7 +84,8 @@ export default function App() {
         status: filtroStatusPartida,
         esporte: filtroEsporte,
       });
-      setPartidas(data || []);
+      const ativas = (data || []).filter((p) => p.status !== 'CANCELADA');
+      setPartidas(ativas);
     } catch (err) {
       console.warn('Erro ao carregar partidas abertas:', err);
     } finally {
@@ -100,7 +101,8 @@ export default function App() {
     }
     try {
       const data = await api.partidas.minhas();
-      setMinhasPartidas(data || []);
+      const ativas = (data || []).filter((p) => p.status !== 'CANCELADA');
+      setMinhasPartidas(ativas);
     } catch {
       // Ignora erro
     }
@@ -175,6 +177,17 @@ export default function App() {
     };
   }, [user]);
 
+  // Chamado quando uma partida é cancelada ou abandonada pelo usuário
+  const handlePartidaCancelada = useCallback((partidaId) => {
+    // Remove imediatamente do estado local de partidas ativas
+    setMinhasPartidas((prev) => prev.filter((p) => p.id !== partidaId));
+    setPartidas((prev) => prev.filter((p) => p.id !== partidaId));
+    setPartidaDetalhes(null);
+    // Sincroniza com o servidor
+    carregarPartidas();
+    carregarMinhasPartidas();
+  }, [carregarPartidas, carregarMinhasPartidas]);
+
   // Atualiza detalhes da partida ativa se aberta no modal
   const handleAtualizarPartidaAtiva = async () => {
     await carregarPartidas();
@@ -182,7 +195,11 @@ export default function App() {
     if (partidaDetalhes) {
       try {
         const atualizada = await api.partidas.buscarPorId(partidaDetalhes.id);
-        setPartidaDetalhes(atualizada);
+        if (atualizada.status === 'CANCELADA') {
+          handlePartidaCancelada(partidaDetalhes.id);
+        } else {
+          setPartidaDetalhes(atualizada);
+        }
       } catch {
         setPartidaDetalhes(null);
       }
@@ -646,6 +663,7 @@ export default function App() {
           user={user}
           onClose={() => setPartidaDetalhes(null)}
           onAtualizar={handleAtualizarPartidaAtiva}
+          onPartidaCancelada={handlePartidaCancelada}
           onAbrirAuth={() => setAuthModalOpen(true)}
         />
       )}

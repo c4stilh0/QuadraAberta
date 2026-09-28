@@ -27,10 +27,11 @@ public class PartidaController {
     @Operation(summary = "Listar partidas ativas buscando jogadores ou com quadra definida")
     public ResponseEntity<List<PartidaResponseDTO>> listarPartidas(
             @RequestParam(value = "esporte", required = false) String esporte,
+            @RequestParam(value = "status", required = false) com.quadraaberta.api.entity.enums.StatusPartida status,
             @AuthenticationPrincipal Usuario usuarioLogado
     ) {
         Long usuarioId = usuarioLogado != null ? usuarioLogado.getId() : null;
-        List<PartidaResponseDTO> partidas = matchmakingService.listarPartidasAtivas(esporte, usuarioId);
+        List<PartidaResponseDTO> partidas = matchmakingService.listarPartidasAtivas(esporte, status, usuarioId);
         return ResponseEntity.ok(partidas);
     }
 

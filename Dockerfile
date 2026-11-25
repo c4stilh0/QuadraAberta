@@ -18,11 +18,12 @@ RUN mvn clean package -DskipTests -B
 # ==============================================================================
 FROM eclipse-temurin:17-jre-alpine
 
-# Criação de usuário não-root para máxima segurança
-RUN addgroup -S quadra && adduser -S quadra -G quadra
-USER quadra:quadra
-
+# Criação de usuário não-root e diretório de uploads para máxima segurança
 WORKDIR /app
+RUN addgroup -S quadra && adduser -S quadra -G quadra \
+    && mkdir -p /app/uploads \
+    && chown -R quadra:quadra /app
+USER quadra:quadra
 
 # Copia apenas o artefato final compilado
 COPY --from=builder /build/target/quadra-aberta-api-0.0.1-SNAPSHOT.jar app.jar

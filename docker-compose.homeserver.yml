@@ -1,0 +1,87 @@
+services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: quadra_aberta_pg_prod
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      POSTGRES_DB: ${POSTGRES_DB:-quadra_aberta_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+    # Sem exposição da porta 5432 para fora do Docker (isolado na rede interna)
+    volumes:
+      - pg_data_homeserver:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-quadra_aberta_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quadra_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quadra_aberta_api_prod
+    restart: unless-stopped
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/${POSTGRES_DB:-quadra_aberta_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET forte no arquivo .env}
+      JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-demo-quadraaberta}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-demo-key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-demo-secret}
+      # Vazio usa caminho relativo (/uploads/...) via Nginx na mesma origem
+      QUADRAABERTA_BACKEND_URL: ${QUADRAABERTA_BACKEND_URL:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8088}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      FORWARD_HEADERS_STRATEGY: framework
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m -XX:+UseG1GC -XX:+UseStringDeduplication -Dfile.encoding=UTF-8}
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - quadra_internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+        VITE_ENABLE_DEMO_LOGIN: ${VITE_ENABLE_DEMO_LOGIN:-false}
+    container_name: quadra_aberta_web_prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # Por padrão escuta apenas em localhost (ideal para Cloudflare Tunnel / proxy local)
+      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-8088}:80"
+    networks:
+      - quadra_internal
+
+  # Opcional: suba com `--profile tunnel` para expor via Cloudflare Tunnel sem abrir portas no roteador
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: quadra_aberta_tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    depends_on:
+      - frontend
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - quadra_internal
+
+volumes:
+  pg_data_homeserver:
+  uploads_data:
+
+networks:
+  quadra_internal:
+    driver: bridge

@@ -27,7 +27,7 @@ O **QuadraAberta** atende diretamente a três Objetivos de Desenvolvimento Suste
 | **Dump Completo PostgreSQL (.sql)** | [database/quadra_aberta_dump.sql](database/quadra_aberta_dump.sql) |
 | **Migrations Versionadas (Flyway)** | [src/main/resources/db/migration](src/main/resources/db/migration) (`V1` a `V7`) |
 | **Documentação Ativa da API (Swagger)** | `http://localhost:8080/swagger-ui.html` (`/v3/api-docs`) |
-| **Guias de Deploy e Walkthrough** | [DEPLOY.md](DEPLOY.md) · [HOMESERVER_DEPLOY.md](HOMESERVER_DEPLOY.md) · [walkthrough.md](walkthrough.md) |
+| **Guias de Deploy** | [DEPLOY.md](DEPLOY.md) · [HOMESERVER_DEPLOY.md](HOMESERVER_DEPLOY.md) |
 
 ---
 

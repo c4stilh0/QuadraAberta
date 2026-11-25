@@ -37,3 +37,14 @@ build/
 .env.*
 !.env.example
 !.env.homeserver.example
+uploads/
+
+### Temporary, Scratch & AI Artifacts ###
+scratch/
+walkthrough.md
+.gemini/
+.agent/
+.claude/
+*.log
+.DS_Store
+Thumbs.db

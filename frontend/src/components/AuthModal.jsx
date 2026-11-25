@@ -17,6 +17,9 @@ export default function AuthModal({ onClose, onSuccess }) {
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
   const [role, setRole] = useState('ROLE_COMUNIDADE');
+  const showDemoShortcuts =
+    import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true' ||
+    (import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -82,8 +85,13 @@ export default function AuthModal({ onClose, onSuccess }) {
     setErro(null);
 
     const emailLimpo = email.trim();
+    const cpfLimpo = cpf.replace(/\D/g, '');
     if (!emailLimpo) {
       setErro('Por favor, informe o e-mail cadastrado.');
+      return;
+    }
+    if (!cpfLimpo || cpfLimpo.length !== 11) {
+      setErro('Informe os 11 dígitos do CPF cadastrado para confirmar sua identidade.');
       return;
     }
     if (!novaSenha || novaSenha.length < 6) {
@@ -94,7 +102,7 @@ export default function AuthModal({ onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      await api.auth.redefinirSenha({ email: emailLimpo, novaSenha });
+      await api.auth.redefinirSenha({ email: emailLimpo, cpf: cpfLimpo, novaSenha });
       setSucesso('Senha redefinida com sucesso! Acessando sua conta...');
       
       // Conecta automaticamente com a nova senha escolhida
@@ -237,30 +245,32 @@ export default function AuthModal({ onClose, onSuccess }) {
               {loading ? 'Entrando...' : 'Acessar Conta'}
             </button>
 
-            {/* Atalhos com 1 Clique */}
-            <div className="pt-3 border-t border-slate-800 space-y-2 text-center">
-              <p className="text-[10px] text-slate-400 font-medium">
-                Acesso direto de teste com 1 clique (Senha: <strong className="text-slate-300 font-mono">senhaSegura123</strong>):
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => entrarDireto('gestor@setelagoas.mg.gov.br', 'senhaSegura123')}
-                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[11px] text-amber-300 font-semibold transition-all inline-flex items-center justify-center space-x-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Entrar como Gestor</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => entrarDireto('viniciuscastilho8@gmail.com', 'senhaSegura123')}
-                  className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[11px] text-emerald-300 font-semibold transition-all inline-flex items-center justify-center space-x-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Entrar como Morador</span>
-                </button>
+            {/* Atalhos com 1 Clique (apenas dev ou quando habilitado explicitamente) */}
+            {showDemoShortcuts && (
+              <div className="pt-3 border-t border-slate-800 space-y-2 text-center">
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Acesso direto de teste com 1 clique (Senha: <strong className="text-slate-300 font-mono">senhaSegura123</strong>):
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => entrarDireto('gestor@setelagoas.mg.gov.br', 'senhaSegura123')}
+                    className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[11px] text-amber-300 font-semibold transition-all inline-flex items-center justify-center space-x-1"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Entrar como Gestor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => entrarDireto('viniciuscastilho8@gmail.com', 'senhaSegura123')}
+                    className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[11px] text-emerald-300 font-semibold transition-all inline-flex items-center justify-center space-x-1"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Entrar como Morador</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </form>
         ) : tab === 'cadastro' ? (
           <form onSubmit={handleCadastro} className="space-y-3">
@@ -333,7 +343,6 @@ export default function AuthModal({ onClose, onSuccess }) {
                 >
                   <option value="ROLE_COMUNIDADE">Morador Comunitário</option>
                   <option value="ROLE_VOLUNTARIO">Instrutor Voluntário</option>
-                  <option value="ROLE_GESTOR">Gestor Público</option>
                 </select>
               </div>
             </div>
@@ -388,6 +397,20 @@ export default function AuthModal({ onClose, onSuccess }) {
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                CPF Cadastrado (Verificação de Identidade)
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="111.444.777-35"
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
               />
             </div>

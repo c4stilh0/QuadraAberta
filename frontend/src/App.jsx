@@ -345,6 +345,9 @@ export default function App() {
                   {minhasPartidas.map((p) => {
                     const isCriador = String(user.id) === String(p.criadorId);
                     const cfg = ESPORTES_CONFIG[p.esporte] || { icon: '⚽', label: p.esporte };
+                    const rawData = p.dataHora || p.dataHoraPartida;
+                    const titulo = p.titulo || p.descricao || `Partida de ${cfg.label}`;
+                    const minJog = p.minJogadores || p.quorumMinimo || 10;
 
                     return (
                       <div
@@ -361,20 +364,26 @@ export default function App() {
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                               p.status === 'QUADRA_DEFINIDA'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : p.status === 'FINALIZADA'
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                                 : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
                             }`}>
-                              {p.status === 'QUADRA_DEFINIDA' ? 'Quadra Definida' : 'Buscando'}
+                              {p.status === 'QUADRA_DEFINIDA'
+                                ? 'Quadra Definida'
+                                : p.status === 'FINALIZADA'
+                                ? 'Finalizada'
+                                : 'Buscando'}
                             </span>
                           </div>
 
-                          <h4 className="font-bold text-white text-sm truncate mb-1">{p.titulo}</h4>
+                          <h4 className="font-bold text-white text-sm truncate mb-1">{titulo}</h4>
                           <p className="text-xs text-slate-400">
-                            📅 {new Date(p.dataHoraPartida).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })} às{' '}
-                            {new Date(p.dataHoraPartida).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            📅 {rawData ? new Date(rawData).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }) : 'Data a definir'} às{' '}
+                            {rawData ? new Date(rawData).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                           </p>
 
                           <div className="mt-2 text-xs text-slate-300 flex items-center justify-between">
-                            <span>👥 {p.totalParticipantes}/{p.quorumMinimo} jogadores</span>
+                            <span>👥 {p.totalParticipantes}/{minJog} jogadores</span>
                             {isCriador && (
                               <span className="text-amber-400 text-[10px] font-bold">👑 Organizador</span>
                             )}

@@ -31,19 +31,26 @@ public class UsuarioService {
 
     @Transactional
     public UsuarioResponseDTO cadastrar(CadastroUsuarioRequestDTO dto) {
-        if (usuarioRepository.existsByEmail(dto.email())) {
+        if (dto.role() == com.quadraaberta.api.entity.enums.Role.ROLE_GESTOR) {
+            throw new ValidacaoNegocioException("Cadastro público não permite o perfil de Gestor Público.");
+        }
+
+        String emailNormalizado = dto.email().trim().toLowerCase();
+        String cpfLimpo = dto.cpf().replaceAll("\\D", "");
+
+        if (usuarioRepository.existsByEmail(emailNormalizado)) {
             throw new ValidacaoNegocioException("Já existe um usuário cadastrado com este e-mail.");
         }
 
-        if (usuarioRepository.existsByCpf(dto.cpf())) {
+        if (usuarioRepository.existsByCpf(cpfLimpo)) {
             throw new ValidacaoNegocioException("Já existe um usuário cadastrado com este CPF.");
         }
 
         Usuario novoUsuario = Usuario.builder()
                 .nome(dto.nome().trim())
-                .email(dto.email().trim().toLowerCase())
+                .email(emailNormalizado)
                 .telefone(dto.telefone())
-                .cpf(dto.cpf().replaceAll("\\D", ""))
+                .cpf(cpfLimpo)
                 .senhaHash(passwordEncoder.encode(dto.senha()))
                 .role(dto.role())
                 .ativo(true)
@@ -131,6 +138,11 @@ public class UsuarioService {
     @Transactional
     public void redefinirSenha(com.quadraaberta.api.dto.RedefinirSenhaRequestDTO dto) {
         Usuario usuario = buscarPorEmail(dto.email().trim().toLowerCase());
+        String cpfInformado = dto.cpf().replaceAll("\\D", "");
+        String cpfCadastrado = usuario.getCpf() != null ? usuario.getCpf().replaceAll("\\D", "") : "";
+        if (cpfInformado.isBlank() || !cpfInformado.equals(cpfCadastrado)) {
+            throw new ValidacaoNegocioException("Os dados informados não conferem com o cadastro do usuário.");
+        }
         usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
         usuarioRepository.save(usuario);
     }

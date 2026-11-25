@@ -103,6 +103,17 @@ public class PartidaController {
         return ResponseEntity.ok(partida);
     }
 
+    @PostMapping("/{id}/finalizar")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Finalizar uma partida encerrada para liberar avaliações dos colegas")
+    public ResponseEntity<PartidaResponseDTO> finalizarPartida(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Usuario usuarioLogado
+    ) {
+        PartidaResponseDTO partida = matchmakingService.finalizarPartida(id, usuarioLogado);
+        return ResponseEntity.ok(partida);
+    }
+
     @DeleteMapping("/{id}")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Cancelar uma partida criada")

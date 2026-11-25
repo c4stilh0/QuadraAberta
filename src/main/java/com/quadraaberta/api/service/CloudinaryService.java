@@ -95,7 +95,8 @@ public class CloudinaryService {
             Files.copy(arquivo.getInputStream(), caminhoArquivo, StandardCopyOption.REPLACE_EXISTING);
 
             log.info("Imagem salva localmente com sucesso em: {}", caminhoArquivo.toAbsolutePath());
-            return backendUrl + "/uploads/" + pasta + "/" + nomeArquivo;
+            String base = backendUrl != null ? backendUrl.replaceAll("/+$", "") : "";
+            return base + "/uploads/" + pasta + "/" + nomeArquivo;
         } catch (IOException e) {
             log.error("Erro ao salvar imagem localmente", e);
             throw new ValidacaoNegocioException("Falha ao salvar a imagem no armazenamento.");

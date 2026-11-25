@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 
 // Decodifica o payload de um token JWT em Base64Url de forma segura com suporte UTF-8
 export function parseJwt(token) {
@@ -155,8 +155,8 @@ async function request(endpoint, options = {}) {
   let response;
   try {
     response = await fetch(url, config);
-  } catch (networkError) {
-    throw new Error('Não foi possível conectar ao servidor da API (porta 8080). Verifique se o backend está em execução.');
+  } catch {
+    throw new Error('Não foi possível conectar ao servidor da API. Verifique sua conexão ou se o backend está em execução.');
   }
 
   // Se a API retornar 401 Unauthorized em endpoint protegido, a sessão expirou ou é inválida
@@ -287,6 +287,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ quadraId })
     }),
+    finalizar: (id) => request(`/api/partidas/${id}/finalizar`, { method: 'POST' }),
     cancelar: (id) => request(`/api/partidas/${id}`, { method: 'DELETE' }),
     listarMensagens: (id) => request(`/api/partidas/${id}/mensagens`),
     enviarMensagem: (id, dados) => request(`/api/partidas/${id}/mensagens`, {

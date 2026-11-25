@@ -71,7 +71,7 @@ export default function ZeladoriaView({ user, onOpenNovoChamado }) {
 
         <button
           onClick={onOpenNovoChamado}
-          className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-glow-amber transition-all hover:scale-[1.02]"
+          className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-glow-amber transition-all hover:scale-[1.02] whitespace-nowrap shrink-0"
         >
           <Camera className="w-4 h-4" />
           <span>Reportar Problema</span>

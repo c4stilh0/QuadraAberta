@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Users, MapPin, Calendar, Clock, Trophy, CheckCircle2, 
   AlertCircle, ShieldCheck, ArrowRight, Navigation, Sparkles, LogOut, Check,
@@ -32,7 +32,44 @@ export default function PartidaDetalhesModal({
   const [erroChat, setErroChat] = useState(null);
   const chatBottomRef = useRef(null);
 
+  const partidaId = partida?.id;
+
+  // Carrega mensagens do chat e mantém polling ativo enquanto modal estiver aberto
+  const carregarMensagens = useCallback(async (silencioso = false) => {
+    if (!partidaId) return;
+    try {
+      const data = await api.partidas.listarMensagens(partidaId);
+      setMensagens(data || []);
+      if (!silencioso) {
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
+    } catch (err) {
+      if (!silencioso) {
+        console.warn('Erro ao carregar mensagens:', err);
+      }
+    }
+  }, [partidaId]);
+
+  useEffect(() => {
+    if (!partidaId) return;
+    carregarMensagens(false);
+    const interval = setInterval(() => {
+      carregarMensagens(true);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [partidaId, carregarMensagens]);
+
+  useEffect(() => {
+    if (partidaId && activeModalTab === 'chat') {
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    }
+  }, [partidaId, activeModalTab, mensagens.length]);
+
   if (!partida) return null;
+
+  const isFinalizada = partida.status === 'FINALIZADA';
+  const isCancelada = partida.status === 'CANCELADA';
+  const isEncerrada = isFinalizada || isCancelada;
 
   const esporteCfg = ESPORTES_CONFIG[partida.esporte] || {
     label: partida.esporteDescricao || partida.esporte,
@@ -70,36 +107,6 @@ export default function PartidaDetalhesModal({
   const sugestoes = partida.sugestoesQuadras || partida.top3QuadrasSugeridas || [];
   const quadraEscolhida = partida.quadraEscolhida || partida.quadraDefinida;
   const tituloPartida = partida.titulo || partida.descricao || `Partida de ${esporteCfg.label}`;
-
-  // Carrega mensagens do chat e mantém polling ativo enquanto modal estiver aberto
-  const carregarMensagens = async (silencioso = false) => {
-    if (!partida?.id) return;
-    try {
-      const data = await api.partidas.listarMensagens(partida.id);
-      setMensagens(data || []);
-      if (!silencioso) {
-        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      }
-    } catch (err) {
-      if (!silencioso) {
-        console.warn('Erro ao carregar mensagens:', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    carregarMensagens(false);
-    const interval = setInterval(() => {
-      carregarMensagens(true);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [partida?.id]);
-
-  useEffect(() => {
-    if (activeModalTab === 'chat') {
-      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
-    }
-  }, [activeModalTab, mensagens.length]);
 
   const handleEnviarMensagem = async (textoParaEnviar) => {
     const texto = (typeof textoParaEnviar === 'string' ? textoParaEnviar : novaMensagem).trim();
@@ -223,6 +230,21 @@ export default function PartidaDetalhesModal({
     }
   };
 
+  const handleFinalizarPartida = async () => {
+    if (!window.confirm('Marcar esta partida como finalizada? Após finalizar, o jogo sai da lista aberta e os participantes podem avaliar os colegas.')) return;
+    try {
+      setLoadingAcao(true);
+      setErroMsg(null);
+      await api.partidas.finalizar(partida.id);
+      setFeedbackMsg('Partida finalizada! Agora você e os colegas podem registrar as avaliações.');
+      onAtualizar?.();
+    } catch (err) {
+      setErroMsg(err.message || 'Erro ao finalizar partida.');
+    } finally {
+      setLoadingAcao(false);
+    }
+  };
+
   const handleCancelarPartida = async () => {
     if (!window.confirm('Tem certeza que deseja cancelar esta partida para todos os participantes?')) return;
     try {
@@ -270,6 +292,11 @@ export default function PartidaDetalhesModal({
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center space-x-1 animate-pulse">
               <span className="w-2 h-2 rounded-full bg-sky-400"></span>
               <span>Buscando Jogadores ({totalParts}/{minJog} mín)</span>
+            </span>
+          ) : partida.status === 'FINALIZADA' ? (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center space-x-1">
+              <Award className="w-3.5 h-3.5 text-purple-400" />
+              <span>Partida Finalizada</span>
             </span>
           ) : (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">
@@ -508,11 +535,16 @@ export default function PartidaDetalhesModal({
           {sugestoes && sugestoes.length > 0 ? (
             <div className="space-y-3">
               {sugestoes.map((q, idx) => {
-                const isEscolhida = quadraEscolhida?.id === q.id;
+                const sugestaoId = q.quadraId ?? q.id;
+                const isEscolhida = Boolean(
+                  quadraEscolhida?.id &&
+                  sugestaoId &&
+                  String(quadraEscolhida.id) === String(sugestaoId)
+                );
 
                 return (
                   <div
-                    key={q.id}
+                    key={sugestaoId ?? idx}
                     className={`p-4 rounded-2xl border transition-all ${
                       isEscolhida
                         ? 'bg-emerald-950/40 border-emerald-500/60 shadow-glow'
@@ -565,7 +597,7 @@ export default function PartidaDetalhesModal({
                       </div>
 
                       {/* Botão de Escolha para o Criador da Partida */}
-                      {isCriador && (
+                      {isCriador && !isEncerrada && (
                         <div className="sm:self-center shrink-0 pt-2 sm:pt-0">
                           {isEscolhida ? (
                             <span className="text-xs text-emerald-400 font-bold flex items-center space-x-1">
@@ -574,9 +606,9 @@ export default function PartidaDetalhesModal({
                             </span>
                           ) : (
                             <button
-                              id={`btn-escolher-quadra-${q.id}`}
+                              id={`btn-escolher-quadra-${sugestaoId}`}
                               type="button"
-                              onClick={() => handleEscolherQuadra(q.id, q.nome)}
+                              onClick={() => handleEscolherQuadra(sugestaoId, q.nome)}
                               disabled={loadingAcao}
                               className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-glow transition-all flex items-center justify-center space-x-1.5"
                             >
@@ -618,18 +650,39 @@ export default function PartidaDetalhesModal({
         <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <div className="w-full sm:w-auto">
-            {isParticipante ? (
+            {isEncerrada ? (
+              <div className="text-xs font-semibold text-purple-300 flex items-center space-x-2">
+                <Award className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>
+                  {isFinalizada
+                    ? 'Partida encerrada. Use o botão "Avaliar Colegas" acima para registrar reputação.'
+                    : 'Partida cancelada.'}
+                </span>
+              </div>
+            ) : isParticipante ? (
               isCriador ? (
-                <button
-                  id="btn-cancelar-partida"
-                  type="button"
-                  onClick={handleCancelarPartida}
-                  disabled={loadingAcao}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-all flex items-center justify-center space-x-1.5"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Cancelar Partida</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    id="btn-finalizar-partida"
+                    type="button"
+                    onClick={handleFinalizarPartida}
+                    disabled={loadingAcao}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-purple-300 bg-purple-500/15 border border-purple-500/40 hover:bg-purple-500/25 transition-all flex items-center justify-center space-x-1.5"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Finalizar Partida</span>
+                  </button>
+                  <button
+                    id="btn-cancelar-partida"
+                    type="button"
+                    onClick={handleCancelarPartida}
+                    disabled={loadingAcao}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-all flex items-center justify-center space-x-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cancelar Partida</span>
+                  </button>
+                </div>
               ) : (
                 <button
                   id="btn-sair-partida"

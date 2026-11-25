@@ -3,6 +3,7 @@ package com.quadraaberta.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quadraaberta.api.dto.CadastroUsuarioRequestDTO;
 import com.quadraaberta.api.dto.LoginRequestDTO;
+import com.quadraaberta.api.dto.RedefinirSenhaRequestDTO;
 import com.quadraaberta.api.entity.enums.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,5 +72,44 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.token").isString())
                 .andExpect(jsonPath("$.tipo").value("Bearer"))
                 .andExpect(jsonPath("$.email").value("maria.silva@comunidade.com"));
+
+        // 3. Redefinir senha exige CPF compatível
+        RedefinirSenhaRequestDTO redefinirErrado = new RedefinirSenhaRequestDTO(
+                "maria.silva@comunidade.com",
+                "99999999999",
+                "novaSenha123"
+        );
+        mockMvc.perform(post("/api/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(redefinirErrado)))
+                .andExpect(status().isBadRequest());
+
+        RedefinirSenhaRequestDTO redefinirCorreto = new RedefinirSenhaRequestDTO(
+                "maria.silva@comunidade.com",
+                "11144477735",
+                "novaSenha123"
+        );
+        mockMvc.perform(post("/api/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(redefinirCorreto)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Segurança: Deve bloquear cadastro público com perfil ROLE_GESTOR")
+    void deveBloquearCadastroPublicoComoGestor() throws Exception {
+        CadastroUsuarioRequestDTO gestorDTO = new CadastroUsuarioRequestDTO(
+                "Usuário Malicioso",
+                "gestor.fake@comunidade.com",
+                "31977776666",
+                "52998224725",
+                "senhaForte123",
+                Role.ROLE_GESTOR
+        );
+
+        mockMvc.perform(post("/api/auth/cadastrar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(gestorDTO)))
+                .andExpect(status().isBadRequest());
     }
 }

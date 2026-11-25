@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -123,7 +122,7 @@ public class ReservaService {
         // REGRA DE PRIORIDADE SOCIAL: Conflito com Turmas Sociais Contínuas
         // =========================================================================
         if (dto.tipoReserva() == TipoReserva.PARTIDA_AVULSA) {
-            DiaSemana diaSemana = converterParaDiaSemana(dto.dataInicio().getDayOfWeek());
+            DiaSemana diaSemana = DiaSemana.fromDayOfWeek(dto.dataInicio().getDayOfWeek());
             LocalTime inicioHora = dto.dataInicio().toLocalTime();
             LocalTime fimHora = dto.dataFim().toLocalTime();
 
@@ -194,17 +193,5 @@ public class ReservaService {
                 inicio != null ? inicio : LocalDateTime.now().minusDays(1),
                 fim != null ? fim : LocalDateTime.now().plusMonths(1)
         ).stream().map(ReservaResponseDTO::fromEntity).toList();
-    }
-
-    private DiaSemana converterParaDiaSemana(DayOfWeek dayOfWeek) {
-        return switch (dayOfWeek) {
-            case MONDAY -> DiaSemana.SEGUNDA;
-            case TUESDAY -> DiaSemana.TERCA;
-            case WEDNESDAY -> DiaSemana.QUARTA;
-            case THURSDAY -> DiaSemana.QUINTA;
-            case FRIDAY -> DiaSemana.SEXTA;
-            case SATURDAY -> DiaSemana.SABADO;
-            case SUNDAY -> DiaSemana.DOMINGO;
-        };
     }
 }

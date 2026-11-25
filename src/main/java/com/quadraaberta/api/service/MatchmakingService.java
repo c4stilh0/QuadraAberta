@@ -4,19 +4,28 @@ import com.quadraaberta.api.dto.*;
 import com.quadraaberta.api.entity.PartidaMatch;
 import com.quadraaberta.api.entity.ParticipantePartida;
 import com.quadraaberta.api.entity.Quadra;
+import com.quadraaberta.api.entity.Reserva;
+import com.quadraaberta.api.entity.TurmaSocial;
 import com.quadraaberta.api.entity.Usuario;
+import com.quadraaberta.api.entity.enums.DiaSemana;
+import com.quadraaberta.api.entity.enums.Role;
 import com.quadraaberta.api.entity.enums.StatusPartida;
 import com.quadraaberta.api.entity.enums.StatusQuadra;
+import com.quadraaberta.api.entity.enums.StatusReserva;
+import com.quadraaberta.api.exception.ConflitoHorarioException;
 import com.quadraaberta.api.exception.EntidadeNaoEncontradaException;
 import com.quadraaberta.api.exception.ValidacaoNegocioException;
 import com.quadraaberta.api.repository.PartidaMatchRepository;
 import com.quadraaberta.api.repository.QuadraRepository;
+import com.quadraaberta.api.repository.ReservaRepository;
+import com.quadraaberta.api.repository.TurmaSocialRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 @Service
@@ -26,6 +35,8 @@ public class MatchmakingService {
 
     private final PartidaMatchRepository partidaRepository;
     private final QuadraRepository quadraRepository;
+    private final ReservaRepository reservaRepository;
+    private final TurmaSocialRepository turmaSocialRepository;
     private final ChatPartidaService chatPartidaService;
 
     @Transactional
@@ -142,6 +153,10 @@ public class MatchmakingService {
     public PartidaResponseDTO escolherQuadra(Long partidaId, Long quadraId, Usuario usuario) {
         PartidaMatch partida = buscarEntidadePorId(partidaId);
 
+        if (partida.getStatus() == StatusPartida.CANCELADA || partida.getStatus() == StatusPartida.FINALIZADA) {
+            throw new ValidacaoNegocioException("Não é possível alterar a quadra de uma partida encerrada ou cancelada.");
+        }
+
         if (!partida.getCriador().getId().equals(usuario.getId())) {
             throw new ValidacaoNegocioException("Apenas o criador da partida tem permissão para escolher e fixar a quadra.");
         }
@@ -149,9 +164,11 @@ public class MatchmakingService {
         Quadra quadra = quadraRepository.findById(quadraId)
                 .orElseThrow(() -> new EntidadeNaoEncontradaException("Quadra não encontrada com ID: " + quadraId));
 
-        if (quadra.getStatus() == StatusQuadra.INTERDITADA) {
-            throw new ValidacaoNegocioException("Esta quadra está interditada e não pode ser escolhida.");
+        if (quadra.getStatus() != StatusQuadra.DISPONIVEL) {
+            throw new ValidacaoNegocioException("Esta quadra não está disponível no momento (Status: " + quadra.getStatus() + ").");
         }
+
+        validarConflitoHorarioQuadra(partida, quadra);
 
         partida.setQuadraEscolhida(quadra);
         partida.setStatus(StatusPartida.QUADRA_DEFINIDA);
@@ -164,6 +181,55 @@ public class MatchmakingService {
 
         List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(atualizada);
         return PartidaResponseDTO.fromEntity(atualizada, top3, usuario.getId());
+    }
+
+    private void validarConflitoHorarioQuadra(PartidaMatch partida, Quadra quadra) {
+        LocalDateTime inicio = partida.getDataHora();
+        int duracao = partida.getDuracaoMinutos() != null ? partida.getDuracaoMinutos() : 60;
+        LocalDateTime fim = inicio.plusMinutes(duracao);
+
+        List<Reserva> reservasConflitantes = reservaRepository.findSobreposicoes(
+                quadra.getId(), inicio, fim, StatusReserva.CONFIRMADA
+        );
+        if (!reservasConflitantes.isEmpty()) {
+            Reserva r = reservasConflitantes.get(0);
+            throw new ConflitoHorarioException(
+                    "A quadra '" + quadra.getNome() + "' já possui reserva confirmada entre " +
+                    r.getDataInicio() + " e " + r.getDataFim() + "."
+            );
+        }
+
+        DiaSemana diaSemana = DiaSemana.fromDayOfWeek(inicio.getDayOfWeek());
+        LocalTime horaInicio = inicio.toLocalTime();
+        LocalTime horaFim = fim.toLocalTime();
+        List<TurmaSocial> turmasConflitantes = turmaSocialRepository.findConflitosTurma(
+                quadra.getId(), diaSemana, horaInicio, horaFim
+        );
+        if (!turmasConflitantes.isEmpty()) {
+            TurmaSocial t = turmasConflitantes.get(0);
+            throw new ConflitoHorarioException(
+                    "Horário bloqueado prioritariamente para a turma social de '" +
+                    t.getModalidade() + "' (" + t.getHorarioInicio() + " às " + t.getHorarioFim() + ")."
+            );
+        }
+
+        List<PartidaMatch> candidatas = partidaRepository.findPartidasFixadasNaQuadraNoPeriodo(
+                quadra.getId(),
+                StatusPartida.QUADRA_DEFINIDA,
+                partida.getId(),
+                inicio.minusHours(4),
+                fim.plusHours(4)
+        );
+        for (PartidaMatch outra : candidatas) {
+            LocalDateTime outraInicio = outra.getDataHora();
+            int outraDuracao = outra.getDuracaoMinutos() != null ? outra.getDuracaoMinutos() : 60;
+            LocalDateTime outraFim = outraInicio.plusMinutes(outraDuracao);
+            if (outraInicio.isBefore(fim) && outraFim.isAfter(inicio)) {
+                throw new ConflitoHorarioException(
+                        "A quadra '" + quadra.getNome() + "' já está fixada para outra partida comunitária neste horário."
+                );
+            }
+        }
     }
 
     @Transactional(readOnly = true)
@@ -179,6 +245,7 @@ public class MatchmakingService {
                 : List.of(StatusPartida.BUSCANDO_JOGADORES, StatusPartida.QUADRA_DEFINIDA);
 
         List<PartidaMatch> partidas = partidaRepository.buscarPartidasAtivas(statusAtivos, limite);
+        List<Quadra> quadrasElegiveis = carregarQuadrasElegiveis();
 
         return partidas.stream()
                 .filter(p -> {
@@ -188,7 +255,7 @@ public class MatchmakingService {
                     return p.getEsporte().equalsIgnoreCase(esporteFiltro.trim());
                 })
                 .map(p -> {
-                    List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(p);
+                    List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(p, quadrasElegiveis);
                     return PartidaResponseDTO.fromEntity(p, top3, usuarioAutenticadoId);
                 })
                 .toList();
@@ -203,20 +270,49 @@ public class MatchmakingService {
 
     @Transactional(readOnly = true)
     public List<PartidaResponseDTO> listarMinhasPartidas(Long usuarioId) {
-        List<StatusPartida> statusAtivos = List.of(StatusPartida.BUSCANDO_JOGADORES, StatusPartida.QUADRA_DEFINIDA);
-        List<PartidaMatch> minhas = partidaRepository.findMinhasPartidas(usuarioId, statusAtivos);
+        List<StatusPartida> statusVisiveis = List.of(
+                StatusPartida.BUSCANDO_JOGADORES,
+                StatusPartida.QUADRA_DEFINIDA,
+                StatusPartida.FINALIZADA
+        );
+        List<PartidaMatch> minhas = partidaRepository.findMinhasPartidas(usuarioId, statusVisiveis);
+        List<Quadra> quadrasElegiveis = carregarQuadrasElegiveis();
         return minhas.stream()
                 .map(p -> {
-                    List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(p);
+                    List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(p, quadrasElegiveis);
                     return PartidaResponseDTO.fromEntity(p, top3, usuarioId);
                 })
                 .toList();
     }
 
     @Transactional
+    public PartidaResponseDTO finalizarPartida(Long partidaId, Usuario usuario) {
+        PartidaMatch partida = buscarEntidadePorId(partidaId);
+        boolean ehCriador = partida.getCriador().getId().equals(usuario.getId());
+        boolean ehGestor = usuario.getRole() == Role.ROLE_GESTOR;
+        if (!ehCriador && !ehGestor) {
+            throw new ValidacaoNegocioException("Apenas o organizador ou um gestor pode finalizar esta partida.");
+        }
+        if (partida.getStatus() == StatusPartida.CANCELADA) {
+            throw new ValidacaoNegocioException("Não é possível finalizar uma partida cancelada.");
+        }
+        if (partida.getStatus() == StatusPartida.FINALIZADA) {
+            throw new ValidacaoNegocioException("Esta partida já foi finalizada.");
+        }
+
+        partida.setStatus(StatusPartida.FINALIZADA);
+        PartidaMatch salva = partidaRepository.save(partida);
+        chatPartidaService.enviarMensagemSistema(partidaId, "Partida finalizada! Já é possível avaliar os colegas participantes.");
+        log.info("Partida #{} finalizada pelo usuário '{}'", partidaId, usuario.getNome());
+
+        List<QuadraSugeridaDTO> top3 = calcularTop3QuadrasSugeridas(salva);
+        return PartidaResponseDTO.fromEntity(salva, top3, usuario.getId());
+    }
+
+    @Transactional
     public void cancelarPartida(Long partidaId, Usuario usuario) {
         PartidaMatch partida = buscarEntidadePorId(partidaId);
-        if (!partida.getCriador().getId().equals(usuario.getId()) && !usuario.getRole().name().equals("ROLE_GESTOR")) {
+        if (!partida.getCriador().getId().equals(usuario.getId()) && usuario.getRole() != Role.ROLE_GESTOR) {
             throw new ValidacaoNegocioException("Você não tem permissão para cancelar esta partida.");
         }
         partida.setStatus(StatusPartida.CANCELADA);
@@ -225,24 +321,25 @@ public class MatchmakingService {
         log.info("Partida #{} cancelada pelo usuário '{}'", partidaId, usuario.getNome());
     }
 
+    private List<Quadra> carregarQuadrasElegiveis() {
+        return quadraRepository.findAll().stream()
+                .filter(q -> q.getStatus() != StatusQuadra.INTERDITADA)
+                .filter(q -> q.getLatitude() != null && q.getLongitude() != null)
+                .toList();
+    }
+
     /**
      * ALGORITMO DO CENTRÓIDE & TOP 3 QUADRAS MAIS PRÓXIMAS:
      * Calcula o centro de gravidade geográfico e ranqueia as quadras
      * compatíveis com a modalidade pela menor distância média coletiva.
      */
     public List<QuadraSugeridaDTO> calcularTop3QuadrasSugeridas(PartidaMatch partida) {
+        return calcularTop3QuadrasSugeridas(partida, carregarQuadrasElegiveis());
+    }
+
+    private List<QuadraSugeridaDTO> calcularTop3QuadrasSugeridas(PartidaMatch partida, List<Quadra> todasQuadras) {
         List<ParticipantePartida> participantes = partida.getParticipantes();
-        if (participantes == null || participantes.isEmpty()) {
-            return List.of();
-        }
-
-        // 1. Busca todas as quadras não interditadas e georreferenciadas
-        List<Quadra> todasQuadras = quadraRepository.findAll().stream()
-                .filter(q -> q.getStatus() != StatusQuadra.INTERDITADA)
-                .filter(q -> q.getLatitude() != null && q.getLongitude() != null)
-                .toList();
-
-        if (todasQuadras.isEmpty()) {
+        if (participantes == null || participantes.isEmpty() || todasQuadras == null || todasQuadras.isEmpty()) {
             return List.of();
         }
 

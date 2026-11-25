@@ -31,10 +31,25 @@ public interface PartidaMatchRepository extends JpaRepository<PartidaMatch, Long
         JOIN p.participantes part
         WHERE part.usuario.id = :usuarioId
         AND p.status IN (:statusList)
-        ORDER BY p.dataHora ASC
+        ORDER BY p.dataHora DESC
     """)
     List<PartidaMatch> findMinhasPartidas(
             @Param("usuarioId") Long usuarioId,
             @Param("statusList") List<StatusPartida> statusList
+    );
+
+    @Query("""
+        SELECT p FROM PartidaMatch p
+        WHERE p.quadraEscolhida.id = :quadraId
+        AND p.status = :status
+        AND p.id <> :partidaIdExcluir
+        AND p.dataHora BETWEEN :janelaInicio AND :janelaFim
+    """)
+    List<PartidaMatch> findPartidasFixadasNaQuadraNoPeriodo(
+            @Param("quadraId") Long quadraId,
+            @Param("status") StatusPartida status,
+            @Param("partidaIdExcluir") Long partidaIdExcluir,
+            @Param("janelaInicio") LocalDateTime janelaInicio,
+            @Param("janelaFim") LocalDateTime janelaFim
     );
 }

@@ -142,9 +142,12 @@ export default function NovaPartidaModal({ onClose, onSuccess }) {
         parsedDate = d;
       }
 
+      const pad = (n) => String(n).padStart(2, '0');
+      const dataHoraLocal = `${parsedDate.getFullYear()}-${pad(parsedDate.getMonth() + 1)}-${pad(parsedDate.getDate())}T${pad(parsedDate.getHours())}:${pad(parsedDate.getMinutes())}:00`;
+
       await api.partidas.criar({
         esporte,
-        dataHora: parsedDate.toISOString(),
+        dataHora: dataHoraLocal,
         duracaoMinutos: Number(duracaoMinutos),
         minJogadores: Number(quorumMinimo),
         maxJogadores: Number(quorumMaximo),

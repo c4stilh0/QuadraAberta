@@ -90,8 +90,8 @@ export default function AuthModal({ onClose, onSuccess }) {
       setErro('Por favor, informe o e-mail cadastrado.');
       return;
     }
-    if (!cpfLimpo || cpfLimpo.length !== 11) {
-      setErro('Informe os 11 dígitos do CPF cadastrado para confirmar sua identidade.');
+    if (!cpfLimpo) {
+      setErro('Informe o CPF cadastrado para confirmar sua identidade.');
       return;
     }
     if (!novaSenha || novaSenha.length < 6) {

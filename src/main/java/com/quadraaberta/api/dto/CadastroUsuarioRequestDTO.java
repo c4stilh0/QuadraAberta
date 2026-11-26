@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import org.hibernate.validator.constraints.br.CPF;
 
 public record CadastroUsuarioRequestDTO(
         @NotBlank(message = "O nome é obrigatório.")
@@ -21,7 +20,6 @@ public record CadastroUsuarioRequestDTO(
         String telefone,
 
         @NotBlank(message = "O CPF é obrigatório.")
-        @CPF(message = "CPF inválido.")
         String cpf,
 
         @NotBlank(message = "A senha é obrigatória.")

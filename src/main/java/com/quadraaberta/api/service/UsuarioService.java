@@ -38,6 +38,10 @@ public class UsuarioService {
         String emailNormalizado = dto.email().trim().toLowerCase();
         String cpfLimpo = dto.cpf().replaceAll("\\D", "");
 
+        if (cpfLimpo.isEmpty() || cpfLimpo.length() > 14) {
+            throw new ValidacaoNegocioException("Informe um CPF com até 14 dígitos numéricos.");
+        }
+
         if (usuarioRepository.existsByEmail(emailNormalizado)) {
             throw new ValidacaoNegocioException("Já existe um usuário cadastrado com este e-mail.");
         }

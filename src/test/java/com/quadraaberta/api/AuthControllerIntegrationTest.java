@@ -112,4 +112,23 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(gestorDTO)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Cadastro: Deve permitir cadastrar usuário mesmo com CPF matematicamente inválido")
+    void devePermitirCadastroComCpfInvalido() throws Exception {
+        CadastroUsuarioRequestDTO dto = new CadastroUsuarioRequestDTO(
+                "João Teste",
+                "joao.cpfinvalido@comunidade.com",
+                "31966665555",
+                "12345678900",
+                "senhaForte123",
+                Role.ROLE_COMUNIDADE
+        );
+
+        mockMvc.perform(post("/api/auth/cadastrar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.cpf").value("12345678900"));
+    }
 }

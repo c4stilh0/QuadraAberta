@@ -1,0 +1,48 @@
+name: quadra-aberta-dashboard
+services:
+  quadra-aberta-dashboard:
+    build:
+      context: /DATA/AppData/quadra-aberta/dashboard
+      dockerfile: Dockerfile
+    image: quadra-aberta-dashboard:latest
+    container_name: quadra_aberta_dashboard
+    restart: unless-stopped
+    environment:
+      PORT: "8089"
+      TZ: America/Sao_Paulo
+      POSTGRES_DB: ${POSTGRES_DB:-quadra_aberta_db}
+      POSTGRES_USER: ${POSTGRES_USER:-quadra_admin}
+    ports:
+      - "8089:8089"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - quadra-aberta_quadra_internal
+    labels:
+      icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/grafana.svg
+      io.zimaos.app.id: zimaapp://v2app/quadra-aberta-dashboard
+
+networks:
+  quadra-aberta_quadra_internal:
+    external: true
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  category: Developer
+  description:
+    pt_br: Painel de controle, link público atual, acessos ao vivo e ligar/desligar o QuadraAberta
+    en_us: Control dashboard, live tunnel URL, visitor stats, and start/stop controls for QuadraAberta
+  hostname: ""
+  icon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/grafana.svg
+  index: /
+  is_uncontrolled: false
+  main: quadra-aberta-dashboard
+  port_map: "8089"
+  scheme: http
+  store_app_id: quadra-aberta-dashboard
+  title:
+    custom: QuadraAberta Control
+    pt_br: QuadraAberta Control
+    en_us: QuadraAberta Control
